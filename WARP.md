@@ -20,7 +20,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   - Single file: npm test -- src/index.test.ts
   - Filter by name: npm test -- -t "greet"
   - Coverage: npm test -- --coverage
-- Run CLI after build: node dist/cli.cjs --name Yabasha
+- Run CLI after build: node dist/cli.cjs --help
 - Pack tarball (inspect publish contents): npm run version-pack
 
 ## High-level architecture and structure

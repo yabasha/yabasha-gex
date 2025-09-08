@@ -1,63 +1,3 @@
-# @yabasha/gex
-
-Modern **TypeScript npm package + CLI** starter — batteries included:
-
-- ⚙️ Build: **tsup** (ESM + CJS) with type declarations
-- 🧰 CLI: **commander**
-- ✅ Tests: **vitest**
-- 🧹 Code quality: **ESLint (flat)** + **Prettier**
-- 🧾 Releases: **Changesets**
-- 🤖 CI: GitHub Actions (lint, test, build, release)
-
-## Quickstart
-
-```bash
-# 1) Use this template
-git clone <this-repo-or-zip> yourpkg && cd yourpkg
-
-# 2) Install deps
-npm i
-
-# 3) Run tests
-npm test
-
-# 4) Build (dist/ with .mjs + .cjs + d.ts)
-npm run build
-
-# 5) Try the CLI
-node dist/cli.cjs --help
-```
-
-Or run in dev-watch mode:
-
-```bash
-npm run dev
-```
-
-## CLI usage
-
-The published binary name is `gex` (package name remains `@yabasha/gex`). The root command defaults to `local`.
-
-Examples:
-
-```bash
-# Default (local), JSON to stdout or default file when -f is provided
-gex                  # same as: gex local
-gex -f md -o report.md
-
-# Local: exclude devDependencies
-gex local --omit-dev -f json -o deps.json
-
-# Global packages
-gex global -f md -o global.md
-
-# Run locally without install (after build)
-node dist/cli.cjs --help
-node dist/cli.cjs -f json
-```
-
-Banner used in `--help`:
-
 ```
   ________                __
  /  _____/  ____   _____/  |_  ____   ____
@@ -68,41 +8,80 @@ Banner used in `--help`:
                       GEX
 ```
 
-## Rename package
+# GEX — Global/local dependency auditing and documentation for Node.js
 
-- Update `name` in `package.json`.
-- Update CLI name in `package.json > bin` and `src/cli.ts` (`.name('yourpkg')`).
+GEX is a focused CLI that generates structured, reproducible reports of your Node.js package environments:
 
-## Publish to npm
+- Local project dependencies (default)
+- Globally installed packages
+
+Reports can be emitted as machine-readable JSON (default) or human-friendly Markdown. Use GEX to inventory environments, document state for handovers/audits, and keep a versionable dependency log.
+
+## Install
+
+- Requirements: Node >= 18.18, npm
+- Global install:
 
 ```bash
-# Create a changeset (bump + changelog)
-npx changeset
-
-# Version and publish
-npm run release
+npm i -g @yabasha/gex
 ```
 
-> Tip: set `NPM_TOKEN` in your GitHub repo secrets to enable the release workflow.
+Or run locally after building this repo:
 
-## GitHub Actions
-
-- **ci.yml**: runs on PRs and pushes (lint, test, build).
-- **release.yml**: publishes packages on pushes to `main` when Changesets are present.
-
-## Project structure
-
-```
-├── src/
-│   ├── index.ts       # Library entry (exports)
-│   ├── cli.ts         # CLI entry (Commander-based)
-│   └── index.test.ts  # Vitest example
-├── tsup.config.ts     # Dual builds + shebang for CLI
-├── vitest.config.ts
-├── eslint.config.js
-├── tsconfig.json
-├── .changeset/        # Changesets config
-└── .github/workflows/ # CI + Release
+```bash
+npm i
+npm run build
+node dist/cli.cjs --help
 ```
 
-Happy hacking! ✨
+## Usage
+
+Synopsis:
+
+```bash
+gex [options]          # defaults to: gex local
+gex local [options]
+gex global [options]
+```
+
+Common options:
+
+- -f, --output-format <md|json> (default: json)
+- -o, --out-file <path>
+- --full-tree Include the full npm ls JSON under `tree` (default uses depth=0)
+- --omit-dev Local only; exclude devDependencies
+
+Examples:
+
+```bash
+# Local (default): JSON → stdout or to default file if -f provided without -o
+gex                  # same as: gex local
+gex -f md -o report.md
+
+# Local: exclude devDependencies
+gex local --omit-dev -f json -o deps.json
+
+# Global packages
+gex global -f md -o global.md
+```
+
+## JSON schema (summary)
+
+Top-level keys:
+
+- report_version, timestamp, tool_version
+- project_name, project_version (omitted for global reports)
+- global_packages: Array<{ name, version, resolved_path }>
+- local_dependencies: Array<{ name, version, resolved_path }>
+- local_dev_dependencies: Array<{ name, version, resolved_path }>
+- tree: raw `npm ls --json` output (when --full-tree)
+
+## Development (repo)
+
+```bash
+npm i
+npm run build
+npm test
+npm run dev      # watch + shows CLI help on success
+npm run lint
+```

@@ -110,10 +110,9 @@ async function outputReport(
     const outDir = path.dirname(outFile)
     await (await import('node:fs/promises')).mkdir(outDir, { recursive: true })
     await (await import('node:fs/promises')).writeFile(outFile, content, 'utf8')
-     
+
     console.log(`Wrote report to ${outFile}`)
   } else {
-     
     console.log(content)
   }
 }
@@ -142,31 +141,9 @@ export async function run(argv = process.argv) {
     return cmd
   }
 
-  // Root behaves like `local` by default
-  addCommonOptions(program as unknown as Command, { allowOmitDev: true })
-  program.action(async (opts) => {
-    const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
-    const outFile = opts.outFile as string | undefined
-    const fullTree = Boolean(opts.fullTree)
-    const omitDev = Boolean(opts.omitDev)
-
-    let finalOutFile = outFile
-    if (!outFile && opts.outputFormat && typeof opts.outputFormat === 'string') {
-      finalOutFile = `gex-report.${outputFormat}`
-    }
-
-    const { report, markdownExtras } = await produceReport('local', {
-      outputFormat,
-      outFile: finalOutFile,
-      fullTree,
-      omitDev,
-    })
-    await outputReport(report, outputFormat, finalOutFile, markdownExtras)
-  })
-
-  // gex local
+  // gex local (default command)
   const localCmd = program
-    .command('local')
+    .command('local', { isDefault: true })
     .description("Generate a report for the current project's dependencies")
   addCommonOptions(localCmd, { allowOmitDev: true })
   localCmd.action(async (opts) => {

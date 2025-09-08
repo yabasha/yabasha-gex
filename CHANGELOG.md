@@ -1,5 +1,11 @@
 # @yabasha/gex
 
+## 0.3.2
+
+### Patch Changes
+
+- [#7](https://github.com/yabasha/yabasha-gex/pull/7) [`a37b448`](https://github.com/yabasha/yabasha-gex/commit/a37b4484b135cf8a809fde762d0174cfed8e94d5) Thanks [@yabasha](https://github.com/yabasha)! - Docs: add Contribute section to README with setup, tests, changesets, and PR flow. Also document `gex read` JSON+Markdown support and positional path.
+
 ## 0.3.0
 
 ### Minor Changes

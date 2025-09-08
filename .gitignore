@@ -8,3 +8,5 @@ coverage
 .vscode
 .idea
 gex-report.json
+.DS_Store
+global.md

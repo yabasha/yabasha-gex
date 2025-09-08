@@ -76,6 +76,57 @@ Top-level keys:
 - local_dev_dependencies: Array<{ name, version, resolved_path }>
 - tree: raw `npm ls --json` output (when --full-tree)
 
+Example (truncated):
+
+```json
+{
+  "report_version": "1.0",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "tool_version": "0.1.0",
+  "project_name": "my-app",
+  "project_version": "1.2.3",
+  "global_packages": [],
+  "local_dependencies": [
+    {
+      "name": "commander",
+      "version": "12.1.0",
+      "resolved_path": "/path/to/project/node_modules/commander"
+    }
+  ],
+  "local_dev_dependencies": [
+    {
+      "name": "vitest",
+      "version": "2.1.1",
+      "resolved_path": "/path/to/project/node_modules/vitest"
+    }
+  ]
+}
+```
+
+## Production usage
+
+- Deterministic output: packages are sorted by name; default uses depth=0 for fast, stable runs.
+- Exit codes: returns 0 on success; non-zero on fatal errors (e.g., npm not found, unreadable output).
+- npm behavior: npm ls may exit non-zero but still produce JSON; GEX parses stdout when available.
+- Paths: resolved_path is best-effort from npm and environment (uses `npm root -g` for global discovery).
+
+CI/CD examples:
+
+- Using npx (no global install):
+
+```bash
+npx -y @yabasha/gex@latest -f json -o gex-report.json
+```
+
+- GitHub Actions step snippet:
+
+```yaml
+- name: Generate dependency report
+  run: npx -y @yabasha/gex@latest -f json -o gex-report.json
+```
+
+## Development (repo)
+
 ## Development (repo)
 
 ```bash

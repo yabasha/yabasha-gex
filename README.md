@@ -1,47 +1,61 @@
-# @yabasha/gex
+```
+  ________                __
+ /  _____/  ____   _____/  |_  ____   ____
+/   \\  ___ /  _ \\ /  _ \\   __\\/ __ \\ /    \\
+\\    \\_\\  (  <_> |  <_> )  | \\  ___/|   |  \\
+ \\______  /\\____/ \\____/|__|  \\___  >___|  /
+        \\/                         \\/     \\/
+                      GEX
 
-Modern **TypeScript npm package + CLI** starter — batteries included:
+```
 
-- ⚙️ Build: **tsup** (ESM + CJS) with type declarations
-- 🧰 CLI: **commander**
-- ✅ Tests: **vitest**
-- 🧹 Code quality: **ESLint (flat)** + **Prettier**
-- 🧾 Releases: **Changesets**
-- 🤖 CI: GitHub Actions (lint, test, build, release)
+# GEX — Global/local dependency auditing and documentation for Node.js
 
-## Quickstart
+GEX is a focused CLI that generates structured, reproducible reports of your Node.js package environments:
+
+- Local project dependencies (default)
+- Globally installed packages
+
+Reports can be emitted as machine-readable JSON (default) or human-friendly Markdown. Use GEX to inventory environments, document state for handovers/audits, and keep a versionable dependency log.
+
+## Install
+
+- Requirements: Node >= 18.18, npm
+- Global install:
 
 ```bash
-# 1) Use this template
-git clone <this-repo-or-zip> yourpkg && cd yourpkg
+npm i -g @yabasha/gex
+```
 
-# 2) Install deps
+Or run locally after building this repo:
+
+```bash
 npm i
-
-# 3) Run tests
-npm test
-
-# 4) Build (dist/ with .mjs + .cjs + d.ts)
 npm run build
-
-# 5) Try the CLI
 node dist/cli.cjs --help
 ```
 
-Or run in dev-watch mode:
+## Usage
+
+Synopsis:
 
 ```bash
-npm run dev
+gex [options]          # defaults to: gex local
+gex local [options]
+gex global [options]
 ```
 
-## CLI usage
+Common options:
 
-The published binary name is `gex` (package name remains `@yabasha/gex`). The root command defaults to `local`.
+- f, --output-format <md|json> (default: json)
+- o, --out-file <path>
+- -full-tree Include the full npm ls JSON under `tree` (default uses depth=0)
+- -omit-dev Local only; exclude devDependencies
 
 Examples:
 
 ```bash
-# Default (local), JSON to stdout or default file when -f is provided
+# Local (default): JSON → stdout or to default file if -f provided without -o
 gex                  # same as: gex local
 gex -f md -o report.md
 
@@ -50,59 +64,74 @@ gex local --omit-dev -f json -o deps.json
 
 # Global packages
 gex global -f md -o global.md
-
-# Run locally without install (after build)
-node dist/cli.cjs --help
-node dist/cli.cjs -f json
 ```
 
-Banner used in `--help`:
+## JSON schema (summary)
 
+Top-level keys:
+
+- report_version, timestamp, tool_version
+- project_name, project_version (omitted for global reports)
+- global_packages: Array<{ name, version, resolved_path }>
+- local_dependencies: Array<{ name, version, resolved_path }>
+- local_dev_dependencies: Array<{ name, version, resolved_path }>
+- tree: raw `npm ls --json` output (when --full-tree)
+
+Example (truncated):
+
+```json
+{
+  "report_version": "1.0",
+  "timestamp": "2025-01-01T12:00:00.000Z",
+  "tool_version": "0.1.0",
+  "project_name": "my-app",
+  "project_version": "1.2.3",
+  "global_packages": [],
+  "local_dependencies": [
+    {
+      "name": "commander",
+      "version": "12.1.0",
+      "resolved_path": "/path/to/project/node_modules/commander"
+    }
+  ],
+  "local_dev_dependencies": [
+    {
+      "name": "vitest",
+      "version": "2.1.1",
+      "resolved_path": "/path/to/project/node_modules/vitest"
+    }
+  ]
+}
 ```
-  ________                __
- /  _____/  ____   _____/  |_  ____   ____
-/   \  ___ /  _ \ /  _ \   __\/ __ \ /    \
-\    \_\  (  <_> |  <_> )  | \  ___/|   |  \
- \______  /\____/ \____/|__|  \___  >___|  /
-        \/                         \/     \/
-                      GEX
-```
 
-## Rename package
+## Production usage
 
-- Update `name` in `package.json`.
-- Update CLI name in `package.json > bin` and `src/cli.ts` (`.name('yourpkg')`).
+- Deterministic output: packages are sorted by name; default uses depth=0 for fast, stable runs.
+- Exit codes: returns 0 on success; non-zero on fatal errors (e.g., npm not found, unreadable output).
+- npm behavior: npm ls may exit non-zero but still produce JSON; GEX parses stdout when available.
+- Paths: resolved_path is best-effort from npm and environment (uses `npm root -g` for global discovery).
 
-## Publish to npm
+CI/CD examples:
+
+- Using npx (no global install):
 
 ```bash
-# Create a changeset (bump + changelog)
-npx changeset
-
-# Version and publish
-npm run release
+npx -y @yabasha/gex@latest -f json -o gex-report.json
 ```
 
-> Tip: set `NPM_TOKEN` in your GitHub repo secrets to enable the release workflow.
+- GitHub Actions step snippet:
 
-## GitHub Actions
-
-- **ci.yml**: runs on PRs and pushes (lint, test, build).
-- **release.yml**: publishes packages on pushes to `main` when Changesets are present.
-
-## Project structure
-
-```
-├── src/
-│   ├── index.ts       # Library entry (exports)
-│   ├── cli.ts         # CLI entry (Commander-based)
-│   └── index.test.ts  # Vitest example
-├── tsup.config.ts     # Dual builds + shebang for CLI
-├── vitest.config.ts
-├── eslint.config.js
-├── tsconfig.json
-├── .changeset/        # Changesets config
-└── .github/workflows/ # CI + Release
+```yaml
+- name: Generate dependency report
+  run: npx -y @yabasha/gex@latest -f json -o gex-report.json
 ```
 
-Happy hacking! ✨
+## Development (repo)
+
+```bash
+npm i
+npm run build
+npm test
+npm run dev      # watch + shows CLI help on success
+npm run lint
+```

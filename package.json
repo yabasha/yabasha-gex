@@ -70,14 +70,5 @@
     "*.{ts,tsx,js,jsx}": [
       "eslint --fix"
     ]
-  },
-  "overrides": {
-    "chalk": "5.6.0",
-    "wrap-ansi": "9.0.0",
-    "strip-ansi": "7.1.2",
-    "ansi-styles": "6.2.1",
-    "string-width": "5.1.2",
-    "ansi-regex": "6.0.1",
-    "slice-ansi": "7.1.2"
   }
 }

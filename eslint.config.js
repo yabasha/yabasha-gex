@@ -14,6 +14,13 @@ export default [
         ecmaVersion: 'latest',
         sourceType: 'module',
       },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+        require: 'readonly',
+        module: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': ts,
@@ -22,6 +29,7 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...ts.configs.recommended.rules,
+      '@typescript-eslint/no-explicit-any': 'off',
       'import/order': ['warn', { 'newlines-between': 'always' }],
       'import/no-unresolved': 'off',
       'no-console': 'off',

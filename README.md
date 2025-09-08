@@ -25,13 +25,47 @@ npm test
 npm run build
 
 # 5) Try the CLI
-node dist/cli.cjs --name Yabasha
+node dist/cli.cjs --help
 ```
 
 Or run in dev-watch mode:
 
 ```bash
 npm run dev
+```
+
+## CLI usage
+
+The published binary name is `gex` (package name remains `@yabasha/gex`). The root command defaults to `local`.
+
+Examples:
+
+```bash
+# Default (local), JSON to stdout or default file when -f is provided
+gex                  # same as: gex local
+gex -f md -o report.md
+
+# Local: exclude devDependencies
+gex local --omit-dev -f json -o deps.json
+
+# Global packages
+gex global -f md -o global.md
+
+# Run locally without install (after build)
+node dist/cli.cjs --help
+node dist/cli.cjs -f json
+```
+
+Banner used in `--help`:
+
+```
+  ________                __
+ /  _____/  ____   _____/  |_  ____   ____
+/   \  ___ /  _ \ /  _ \   __\/ __ \ /    \
+\    \_\  (  <_> |  <_> )  | \  ___/|   |  \
+ \______  /\____/ \____/|__|  \___  >___|  /
+        \/                         \/     \/
+                      GEX
 ```
 
 ## Rename package

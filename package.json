@@ -15,7 +15,7 @@
     }
   },
   "bin": {
-    "@yabasha/gex": "./dist/cli.cjs"
+    "gex": "./dist/cli.cjs"
   },
   "files": [
     "dist"

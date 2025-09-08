@@ -1,22 +1,223 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { Command } from 'commander'
-import { greet } from './index.js'
+
+import { npmLs, npmRootGlobal } from './npm.js'
+import { buildReportFromNpmTree } from './transform.js'
+import { renderJson } from './report/json.js'
+import { renderMarkdown } from './report/md.js'
+import type { OutputFormat, Report } from './types.js'
+
+function getPkgJsonPath(): string {
+  // Resolve package.json relative to this file for both ESM and CJS bundles
+  try {
+    const __filename = fileURLToPath((import.meta as any).url)
+    const __dirnameLocal = path.dirname(__filename)
+    return path.resolve(__dirnameLocal, '..', 'package.json')
+  } catch {
+    const dir = typeof __dirname !== 'undefined' ? __dirname : process.cwd()
+    return path.resolve(dir, '..', 'package.json')
+  }
+}
+
+async function getToolVersion(): Promise<string> {
+  try {
+    const pkgPath = getPkgJsonPath()
+    const raw = await readFile(pkgPath, 'utf8')
+    const pkg = JSON.parse(raw)
+    return pkg.version || '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+const ASCII_BANNER = String.raw`
+  ________                __
+ /  _____/  ____   _____/  |_  ____   ____ 
+/   \  ___ /  _ \ /  _ \   __\/ __ \ /    \
+\    \_\  (  <_> |  <_> )  | \  ___/|   |  \
+ \______  /\____/ \____/|__|  \___  >___|  /
+        \/                         \/     \/ 
+                      GEX
+`
+
+async function produceReport(
+  ctx: 'local' | 'global',
+  options: {
+    outputFormat: OutputFormat
+    outFile?: string
+    fullTree?: boolean
+    omitDev?: boolean
+    cwd?: string
+  },
+): Promise<{ report: Report; markdownExtras?: any }> {
+  const toolVersion = await getToolVersion()
+  const depth0 = !options.fullTree
+  const cwd = options.cwd || process.cwd()
+
+  const tree = await npmLs({
+    global: ctx === 'global',
+    omitDev: ctx === 'local' ? Boolean(options.omitDev) : false,
+    depth0,
+    cwd,
+  })
+
+  // Get extra metadata for markdown rendering when local
+  let project_description: string | undefined
+  let project_homepage: string | undefined
+  let project_bugs: string | undefined
+  if (ctx === 'local') {
+    try {
+      const pkgRaw = await readFile(path.join(cwd, 'package.json'), 'utf8')
+      const pkg = JSON.parse(pkgRaw)
+      project_description = pkg.description
+      project_homepage = pkg.homepage
+      if (typeof pkg.bugs === 'string') project_bugs = pkg.bugs
+      else if (pkg.bugs && typeof pkg.bugs.url === 'string') project_bugs = pkg.bugs.url
+    } catch {
+      // ignore
+    }
+  }
+
+  const globalRoot = ctx === 'global' ? await npmRootGlobal().catch(() => undefined) : undefined
+
+  const report = await buildReportFromNpmTree(tree, {
+    context: ctx,
+    includeTree: Boolean(options.fullTree),
+    omitDev: Boolean(options.omitDev),
+    cwd,
+    toolVersion,
+    globalRoot,
+  })
+
+  const markdownExtras = { project_description, project_homepage, project_bugs }
+  return { report, markdownExtras }
+}
+
+async function outputReport(
+  report: Report,
+  format: OutputFormat,
+  outFile?: string,
+  markdownExtras?: any,
+) {
+  const content =
+    format === 'json'
+      ? renderJson(report)
+      : renderMarkdown({ ...report, ...(markdownExtras || {}) })
+  if (outFile) {
+    const outDir = path.dirname(outFile)
+    await (await import('node:fs/promises')).mkdir(outDir, { recursive: true })
+    await (await import('node:fs/promises')).writeFile(outFile, content, 'utf8')
+     
+    console.log(`Wrote report to ${outFile}`)
+  } else {
+     
+    console.log(content)
+  }
+}
 
 export async function run(argv = process.argv) {
   const program = new Command()
-    .name('yourpkg')
-    .description('Your awesome TypeScript CLI')
-    .version('0.1.0')
-    .option('-n, --name <name>', 'Name to greet', 'World')
-    .action((opts) => {
-      // Business logic can live in src/ and be imported.
-      const msg = greet(opts.name)
-      // eslint-disable-next-line no-console
-      console.log(msg)
+    .name('gex')
+    .description('GEX: Dependency auditing and documentation for Node.js (local and global).')
+    .version(await getToolVersion())
+
+  program.addHelpText('beforeAll', `\n${ASCII_BANNER}`)
+
+  const addCommonOptions = (cmd: Command, { allowOmitDev }: { allowOmitDev: boolean }) => {
+    cmd
+      .option(
+        '-f, --output-format <format>',
+        'Output format: md or json',
+        (val) => (val === 'md' ? 'md' : 'json'),
+        'json',
+      )
+      .option('-o, --out-file <path>', 'Write report to file')
+      .option('--full-tree', 'Include full npm ls tree (omit depth=0 default)', false)
+    if (allowOmitDev) {
+      cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
+    }
+    return cmd
+  }
+
+  // Root behaves like `local` by default
+  addCommonOptions(program as unknown as Command, { allowOmitDev: true })
+  program.action(async (opts) => {
+    const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
+    const outFile = opts.outFile as string | undefined
+    const fullTree = Boolean(opts.fullTree)
+    const omitDev = Boolean(opts.omitDev)
+
+    let finalOutFile = outFile
+    if (!outFile && opts.outputFormat && typeof opts.outputFormat === 'string') {
+      finalOutFile = `gex-report.${outputFormat}`
+    }
+
+    const { report, markdownExtras } = await produceReport('local', {
+      outputFormat,
+      outFile: finalOutFile,
+      fullTree,
+      omitDev,
     })
+    await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+  })
+
+  // gex local
+  const localCmd = program
+    .command('local')
+    .description("Generate a report for the current project's dependencies")
+  addCommonOptions(localCmd, { allowOmitDev: true })
+  localCmd.action(async (opts) => {
+    const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
+    const outFile = opts.outFile as string | undefined
+    const fullTree = Boolean(opts.fullTree)
+    const omitDev = Boolean(opts.omitDev)
+
+    let finalOutFile = outFile
+    if (!outFile && opts.outputFormat && typeof opts.outputFormat === 'string') {
+      finalOutFile = `gex-report.${outputFormat}`
+    }
+
+    const { report, markdownExtras } = await produceReport('local', {
+      outputFormat,
+      outFile: finalOutFile,
+      fullTree,
+      omitDev,
+    })
+    await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+  })
+
+  // gex global
+  const globalCmd = program
+    .command('global')
+    .description('Generate a report of globally installed packages')
+  addCommonOptions(globalCmd, { allowOmitDev: false })
+  globalCmd.action(async (opts) => {
+    const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
+    const outFile = opts.outFile as string | undefined
+    const fullTree = Boolean(opts.fullTree)
+
+    let finalOutFile = outFile
+    if (!outFile && opts.outputFormat && typeof opts.outputFormat === 'string') {
+      finalOutFile = `gex-report.${outputFormat}`
+    }
+
+    const { report, markdownExtras } = await produceReport('global', {
+      outputFormat,
+      outFile: finalOutFile,
+      fullTree,
+    })
+    await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+  })
 
   await program.parseAsync(argv)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isCjsMain = typeof require !== 'undefined' && (require as any).main === module
+const isEsmMain =
+  typeof import.meta !== 'undefined' && (import.meta as any).url === `file://${process.argv[1]}`
+if (isCjsMain || isEsmMain) {
   run()
 }

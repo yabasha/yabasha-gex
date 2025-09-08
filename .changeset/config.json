@@ -3,7 +3,7 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "YOUR_GH_USER/yourpkg"
+      "repo": "yabasha/yabasha-gex"
     }
   ],
   "commit": false,

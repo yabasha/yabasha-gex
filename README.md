@@ -64,6 +64,12 @@ gex local --omit-dev -f json -o deps.json
 
 # Global packages
 gex global -f md -o global.md
+
+# Read a previous report (default prints names@versions; -i installs)
+# from default gex-report.json
+gex read
+# or specify a file and install
+gex read -r path/to/report.json -i
 ```
 
 ## JSON schema (summary)

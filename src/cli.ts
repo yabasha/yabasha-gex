@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 
 import { Command } from 'commander'
 
@@ -32,6 +34,8 @@ async function getToolVersion(): Promise<string> {
     return '0.0.0'
   }
 }
+
+const execFileAsync = promisify(execFile)
 
 const ASCII_BANNER = String.raw`
   ________                __
@@ -94,6 +98,58 @@ async function produceReport(
 
   const markdownExtras = { project_description, project_homepage, project_bugs }
   return { report, markdownExtras }
+}
+
+function printFromReport(report: Report) {
+  const lines: string[] = []
+  if (report.global_packages.length > 0) {
+    lines.push('Global Packages:')
+    for (const p of report.global_packages) {
+      lines.push(`- ${p.name}@${p.version}`)
+    }
+  }
+  if (report.local_dependencies.length > 0) {
+    if (lines.length) lines.push('')
+    lines.push('Local Dependencies:')
+    for (const p of report.local_dependencies) {
+      lines.push(`- ${p.name}@${p.version}`)
+    }
+  }
+  if (report.local_dev_dependencies.length > 0) {
+    if (lines.length) lines.push('')
+    lines.push('Local Dev Dependencies:')
+    for (const p of report.local_dev_dependencies) {
+      lines.push(`- ${p.name}@${p.version}`)
+    }
+  }
+  if (lines.length === 0) {
+    lines.push('(no packages found in report)')
+  }
+  console.log(lines.join('\n'))
+}
+
+async function installFromReport(report: Report, cwd: string) {
+  const globalPkgs = report.global_packages.map((p) => `${p.name}@${p.version}`).filter(Boolean)
+  const localPkgs = report.local_dependencies.map((p) => `${p.name}@${p.version}`).filter(Boolean)
+  const devPkgs = report.local_dev_dependencies.map((p) => `${p.name}@${p.version}`).filter(Boolean)
+
+  if (globalPkgs.length === 0 && localPkgs.length === 0 && devPkgs.length === 0) {
+    console.log('No packages to install from report.')
+    return
+  }
+
+  if (globalPkgs.length > 0) {
+    console.log(`Installing global: ${globalPkgs.join(' ')}`)
+    await execFileAsync('npm', ['i', '-g', ...globalPkgs], { cwd, maxBuffer: 10 * 1024 * 1024 })
+  }
+  if (localPkgs.length > 0) {
+    console.log(`Installing local deps: ${localPkgs.join(' ')}`)
+    await execFileAsync('npm', ['i', ...localPkgs], { cwd, maxBuffer: 10 * 1024 * 1024 })
+  }
+  if (devPkgs.length > 0) {
+    console.log(`Installing local devDeps: ${devPkgs.join(' ')}`)
+    await execFileAsync('npm', ['i', '-D', ...devPkgs], { cwd, maxBuffer: 10 * 1024 * 1024 })
+  }
 }
 
 async function outputReport(
@@ -187,6 +243,32 @@ export async function run(argv = process.argv) {
       fullTree,
     })
     await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+  })
+
+  // gex read (consume a previous JSON report)
+  const readCmd = program
+    .command('read')
+    .description(
+      'Read a previously generated JSON report and either print package names or install them',
+    )
+    .option('-r, --report <path>', 'Path to report JSON', 'gex-report.json')
+    .option('-p, --print', 'Print package names/versions from the report (default)', false)
+    .option('-i, --install', 'Install packages from the report', false)
+  readCmd.action(async (opts) => {
+    const reportPath = path.resolve(process.cwd(), opts.report as string)
+    const raw = await readFile(reportPath, 'utf8')
+    const parsed = JSON.parse(raw) as Report
+
+    // default behavior: print if --install not provided
+    const doInstall = Boolean(opts.install)
+    const doPrint = Boolean(opts.print) || !doInstall
+
+    if (doPrint) {
+      printFromReport(parsed)
+    }
+    if (doInstall) {
+      await installFromReport(parsed, process.cwd())
+    }
   })
 
   await program.parseAsync(argv)

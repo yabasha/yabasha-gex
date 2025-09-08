@@ -145,3 +145,26 @@ npm test
 npm run dev      # watch + shows CLI help on success
 npm run lint
 ```
+
+## Contribute
+
+We welcome contributions! A quick guide to getting productive:
+
+- Setup
+  - Fork and clone this repo, then: `npm i`
+  - Dev loop: `npm run dev` (rebuilds and prints CLI help on successful build)
+  - One-off build: `npm run build`, then run: `node dist/cli.cjs --help`
+- Test, lint, format
+  - Run tests: `npm test` (or `npm run test:watch`) — uses Vitest
+  - Lint: `npm run lint`; Format: `npm run format`
+- Adding features/fixes
+  - Create a branch (e.g., `feat/read-reports`, `fix/option-parsing`)
+  - Make changes and add tests when reasonable
+  - If the change is user-facing, add a changeset: `npx changeset` (choose bump; write a summary)
+- Open a PR (use `gh` CLI per workspace convention)
+  - Example: `gh pr create --fill` (ensure your branch is pushed)
+  - CI will run tests and build; the Release workflow will open a "Version Packages" PR for changesets
+  - Merge the "Version Packages" PR to publish to npm automatically
+- Quick local verification
+  - Generate a report: `gex -f json -o gex-report.json`
+  - Read a report: `gex read` (JSON) or `gex read global.md` (Markdown); add `-i` to install

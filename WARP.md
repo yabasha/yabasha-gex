@@ -23,6 +23,20 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - Run CLI after build: node dist/cli.cjs --help
 - Pack tarball (inspect publish contents): npm run version-pack
 
+## Read reports
+
+- Command: gex read [report]
+  - Reads a previously generated report and prints package names@versions by default.
+  - Accepts JSON and Markdown reports. Path can be positional or via -r/--report.
+  - Use -i to install the packages listed in the report:
+    - Global packages → npm i -g name@version
+    - Local dependencies → npm i name@version
+    - Local devDependencies → npm i -D name@version
+- Examples:
+  - gex read # reads ./gex-report.json
+  - gex read global.md # Markdown report
+  - gex read -r global.json -i
+
 ## High-level architecture and structure
 
 - Build system: tsup builds two entry points (see tsup.config.ts)

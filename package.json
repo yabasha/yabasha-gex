@@ -70,5 +70,8 @@
     "*.{ts,tsx,js,jsx}": [
       "eslint --fix"
     ]
+  },
+  "overrides": {
+    "wrap-ansi": "^9.0.0"
   }
 }

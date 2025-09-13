@@ -1,5 +1,13 @@
 # @yabasha/gex
 
+## 0.3.3
+
+### Patch Changes
+
+- [#10](https://github.com/yabasha/yabasha-gex/pull/10) [`b8a1183`](https://github.com/yabasha/yabasha-gex/commit/b8a1183afefa81374ed8163728b170e8c1c0935b) Thanks [@yabasha](https://github.com/yabasha)! - chore(release): test CI/CD flow by adding a no-op changeset.
+  - Ensures the Release workflow opens a "Version Packages" PR
+  - After merging that PR, publish should run with a build step
+
 ## 0.3.2
 
 ### Patch Changes

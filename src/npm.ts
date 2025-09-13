@@ -2,10 +2,20 @@
  * @fileoverview npm command execution utilities for dependency analysis
  */
 
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
+/**
+ * Lazily obtain a promisified execFile so tests can mock built-ins reliably.
+ */
+async function getExecFileAsync(): Promise<
+  (
+    command: string,
+    args?: readonly string[] | null,
+    options?: any,
+  ) => Promise<{ stdout: string; stderr: string }>
+> {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  return promisify(execFile) as any
+}
 
 /**
  * Options for npm ls command execution
@@ -46,6 +56,7 @@ export async function npmLs(options: NpmLsOptions = {}): Promise<any> {
   if (options.depth0) args.push('--depth=0')
 
   try {
+    const execFileAsync = await getExecFileAsync()
     const { stdout } = await execFileAsync('npm', args, {
       cwd: options.cwd,
       maxBuffer: 10 * 1024 * 1024,
@@ -89,6 +100,7 @@ export async function npmLs(options: NpmLsOptions = {}): Promise<any> {
  */
 export async function npmRootGlobal(): Promise<string> {
   try {
+    const execFileAsync = await getExecFileAsync()
     const { stdout } = await execFileAsync('npm', ['root', '-g'])
     return stdout.trim()
   } catch (err: any) {

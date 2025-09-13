@@ -2,12 +2,22 @@
  * @fileoverview Package installation utilities for CLI
  */
 
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-
 import type { Report } from '../types.js'
 
-const execFileAsync = promisify(execFile)
+/**
+ * Lazily obtain a promisified execFile so tests can mock built-ins reliably.
+ */
+async function getExecFileAsync(): Promise<
+  (
+    command: string,
+    args?: readonly string[] | null,
+    options?: any,
+  ) => Promise<{ stdout: string; stderr: string }>
+> {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  return promisify(execFile) as any
+}
 
 /**
  * Installs packages from a report to the local environment
@@ -25,6 +35,9 @@ export async function installFromReport(report: Report, cwd: string): Promise<vo
     console.log('No packages to install from report.')
     return
   }
+
+  // Acquire execFileAsync once per run to keep logs grouped, while still mockable in tests
+  const execFileAsync = await getExecFileAsync()
 
   if (globalPkgs.length > 0) {
     console.log(`Installing global: ${globalPkgs.join(' ')}`)

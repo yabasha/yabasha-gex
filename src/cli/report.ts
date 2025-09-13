@@ -68,7 +68,10 @@ export async function produceReport(
       project_homepage = pkg.homepage
       if (typeof pkg.bugs === 'string') project_bugs = pkg.bugs
       else if (pkg.bugs && typeof pkg.bugs.url === 'string') project_bugs = pkg.bugs.url
-    } catch {}
+    } catch {
+      // Ignore errors reading local package.json (e.g., file missing or invalid JSON)
+      void 0
+    }
   }
 
   const globalRoot = ctx === 'global' ? await npmRootGlobal().catch(() => undefined) : undefined

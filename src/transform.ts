@@ -77,7 +77,10 @@ export async function buildReportFromNpmTree(tree: any, opts: NormalizeOptions):
       const pkgJsonPath = path.join(opts.cwd || process.cwd(), 'package.json')
       const raw = await readFile(pkgJsonPath, 'utf8')
       pkgMeta = JSON.parse(raw)
-    } catch {}
+    } catch {
+      // Ignore errors reading/parsing package.json; fall back to undefined metadata
+      void 0
+    }
     if (pkgMeta?.name) report.project_name = pkgMeta.name
     if (pkgMeta?.version) report.project_version = pkgMeta.version
 

@@ -1,5 +1,16 @@
+/**
+ * @fileoverview Markdown report rendering utilities
+ */
+
 import type { Report } from '../types.js'
 
+/**
+ * Creates a markdown table from headers and row data
+ *
+ * @param headers - Array of table header strings
+ * @param rows - Array of row data (each row is array of strings)
+ * @returns Formatted markdown table string
+ */
 function table(headers: string[], rows: string[][]): string {
   const header = `| ${headers.join(' | ')} |`
   const sep = `| ${headers.map(() => '---').join(' | ')} |`
@@ -7,6 +18,33 @@ function table(headers: string[], rows: string[][]): string {
   return [header, sep, body].filter(Boolean).join('\n')
 }
 
+/**
+ * Renders a Report object as formatted Markdown
+ *
+ * @param report - Report object with optional project metadata
+ * @returns Formatted Markdown string with tables and sections
+ *
+ * @example
+ * ```typescript
+ * import { renderMarkdown } from './report/md.js'
+ *
+ * const report = {
+ *   report_version: '1.0',
+ *   timestamp: new Date().toISOString(),
+ *   tool_version: '0.3.2',
+ *   project_name: 'my-project',
+ *   global_packages: [],
+ *   local_dependencies: [
+ *     { name: 'axios', version: '1.6.0', resolved_path: '/path/to/axios' }
+ *   ],
+ *   local_dev_dependencies: [],
+ *   project_description: 'My awesome project'
+ * }
+ *
+ * const markdown = renderMarkdown(report)
+ * console.log(markdown) // Formatted markdown with tables
+ * ```
+ */
 export function renderMarkdown(
   report: Report & {
     project_description?: string
@@ -18,7 +56,13 @@ export function renderMarkdown(
   lines.push('# GEX Report')
   lines.push('')
 
-  if (report.project_name || report.project_version) {
+  if (
+    report.project_name ||
+    report.project_version ||
+    (report as any).project_description ||
+    (report as any).project_homepage ||
+    (report as any).project_bugs
+  ) {
     lines.push('## Project Metadata')
     if (report.project_name) lines.push(`- Name: ${report.project_name}`)
     if (report.project_version) lines.push(`- Version: ${report.project_version}`)

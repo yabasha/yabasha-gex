@@ -42,6 +42,14 @@
     "tsup",
     "commander"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yabasha/yabasha-gex"
+  },
+  "homepage": "https://github.com/yabasha/yabasha-gex#readme",
+  "bugs": {
+    "url": "https://github.com/yabasha/yabasha-gex/issues"
+  },
   "author": "",
   "license": "MIT",
   "devDependencies": {

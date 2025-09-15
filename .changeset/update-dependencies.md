@@ -10,5 +10,6 @@ Update all dependencies to latest versions and resolve security vulnerabilities
 - Updated commander from ^12.1.0 to ^14.0.1
 - Updated vitest from ^2.1.1 to ^3.2.4
 - Updated @changesets/cli from ^2.27.8 to ^2.29.7
+- Updated Node.js engine requirement from >=18.18 to >=20 (required by commander v14)
 - Resolved 5 moderate security vulnerabilities in development dependencies
 - All tests continue to pass and build succeeds with updated dependencies

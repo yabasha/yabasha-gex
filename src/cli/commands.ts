@@ -58,10 +58,8 @@ export function createLocalCommand(program: Command): Command {
     const fullTree = Boolean(opts.fullTree)
     const omitDev = Boolean(opts.omitDev)
 
-    let finalOutFile = outFile
-    if (!outFile && opts.outputFormat && typeof opts.outputFormat === 'string') {
-      finalOutFile = `gex-report.${outputFormat}`
-    }
+    // Only set finalOutFile when explicitly provided via --out-file
+    const finalOutFile = outFile
 
     const { report, markdownExtras } = await produceReport('local', {
       outputFormat,
@@ -94,10 +92,8 @@ export function createGlobalCommand(program: Command): Command {
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
 
-    let finalOutFile = outFile
-    if (!outFile && opts.outputFormat && typeof opts.outputFormat === 'string') {
-      finalOutFile = `gex-report.${outputFormat}`
-    }
+    // Only set finalOutFile when explicitly provided via --out-file
+    const finalOutFile = outFile
 
     const { report, markdownExtras } = await produceReport('global', {
       outputFormat,

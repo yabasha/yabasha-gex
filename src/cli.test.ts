@@ -100,10 +100,8 @@ describe('CLI', () => {
   })
 
   describe('local command (default)', () => {
-    it('should generate local report in JSON format by default', async () => {
+    it('should print local report to console by default', async () => {
       process.argv = ['node', 'cli.js', 'local']
-      mockMkdir.mockResolvedValue(undefined)
-      mockWriteFile.mockResolvedValue()
 
       await run()
 
@@ -114,27 +112,18 @@ describe('CLI', () => {
         cwd: process.cwd(),
       })
 
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'gex-report.json',
-        expect.stringContaining('"report_version": "1.0"'),
-        'utf8',
-      )
-      expect(consoleLogSpy).toHaveBeenCalledWith('Wrote report to gex-report.json')
+      expect(mockWriteFile).not.toHaveBeenCalled()
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('"report_version": "1.0"'))
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('"axios"'))
     })
 
-    it('should generate local report with markdown format', async () => {
+    it('should print markdown report to console', async () => {
       process.argv = ['node', 'cli.js', 'local', '--output-format', 'md']
-      mockMkdir.mockResolvedValue(undefined)
-      mockWriteFile.mockResolvedValue()
 
       await run()
 
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'gex-report.md',
-        expect.stringContaining('# GEX Report'),
-        'utf8',
-      )
-      expect(consoleLogSpy).toHaveBeenCalledWith('Wrote report to gex-report.md')
+      expect(mockWriteFile).not.toHaveBeenCalled()
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('# GEX Report'))
     })
 
     it('should write report to file when --out-file is specified', async () => {
@@ -178,32 +167,11 @@ describe('CLI', () => {
         cwd: process.cwd(),
       })
     })
-
-    it('should output to console when explicit empty out-file', async () => {
-      process.argv = ['node', 'cli.js', 'local']
-      mockMkdir.mockResolvedValue(undefined)
-      mockWriteFile.mockResolvedValue()
-
-      await run()
-
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'gex-report.json',
-        expect.stringContaining('"axios"'),
-        'utf8',
-      )
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'gex-report.json',
-        expect.stringContaining('"commander"'),
-        'utf8',
-      )
-    })
   })
 
   describe('global command', () => {
-    it('should generate global report in JSON format', async () => {
+    it('should print global report to console by default', async () => {
       process.argv = ['node', 'cli.js', 'global']
-      mockMkdir.mockResolvedValue(undefined)
-      mockWriteFile.mockResolvedValue()
       mockNpmLs.mockResolvedValue({
         dependencies: {
           npm: { version: '10.2.0', path: '/usr/local/lib/node_modules/npm' },
@@ -219,17 +187,12 @@ describe('CLI', () => {
         omitDev: false,
       })
       expect(mockNpmRootGlobal).toHaveBeenCalled()
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'gex-report.json',
-        expect.stringContaining('"global_packages"'),
-        'utf8',
-      )
+      expect(mockWriteFile).not.toHaveBeenCalled()
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('"global_packages"'))
     })
 
-    it('should generate global report with markdown format', async () => {
+    it('should print global markdown report to console', async () => {
       process.argv = ['node', 'cli.js', 'global', '--output-format', 'md']
-      mockMkdir.mockResolvedValue(undefined)
-      mockWriteFile.mockResolvedValue()
       mockNpmLs.mockResolvedValue({
         dependencies: {
           npm: { version: '10.2.0', path: '/usr/local/lib/node_modules/npm' },
@@ -238,12 +201,8 @@ describe('CLI', () => {
 
       await run()
 
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        'gex-report.md',
-        expect.stringContaining('# GEX Report'),
-        'utf8',
-      )
-      expect(consoleLogSpy).toHaveBeenCalledWith('Wrote report to gex-report.md')
+      expect(mockWriteFile).not.toHaveBeenCalled()
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('# GEX Report'))
     })
 
     it('should handle npmRootGlobal failure gracefully', async () => {

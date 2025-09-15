@@ -1,0 +1,3 @@
+# Exclude workflow files from prettier to maintain exact match with main branch
+# Required for Claude Code action security validation
+.github/workflows/

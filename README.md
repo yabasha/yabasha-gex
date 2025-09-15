@@ -55,15 +55,20 @@ Common options:
 Examples:
 
 ```bash
-# Local (default): JSON → stdout or to default file if -f provided without -o
-gex                  # same as: gex local
-gex -f md -o report.md
+# Local (default): JSON output to console
+gex                  # prints JSON to console (same as: gex local)
+gex -o report.json   # writes JSON to file
+gex -f md            # prints markdown to console
+gex -f md -o report.md  # writes markdown to file
 
 # Local: exclude devDependencies
-gex local --omit-dev -f json -o deps.json
+gex local --omit-dev    # prints JSON to console
+gex local --omit-dev -o deps.json  # writes JSON to file
 
 # Global packages
-gex global -f md -o global.md
+gex global              # prints JSON to console
+gex global -o global.json  # writes JSON to file
+gex global -f md        # prints markdown to console
 
 # Read a previous report (JSON or Markdown)
 # Default prints names@versions; add -i to install
@@ -74,7 +79,13 @@ gex read -r path/to/report.json -i
 # Markdown
 gex read global.md
 gex read global.md -i
+
+# Shell redirection (alternative to -o flag)
+gex > report.json           # redirect JSON output to file
+gex global | jq '.global_packages'  # pipe output to jq for processing
 ```
+
+> **Note**: Starting from v0.4.0, GEX outputs to console by default instead of creating files automatically. Use the `-o/--out-file` flag to write to a file.
 
 ## JSON schema (summary)
 

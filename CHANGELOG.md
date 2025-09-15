@@ -1,5 +1,15 @@
 # @yabasha/gex
 
+## 0.4.0
+
+### Minor Changes
+
+- [#16](https://github.com/yabasha/yabasha-gex/pull/16) [`a5bf5ee`](https://github.com/yabasha/yabasha-gex/commit/a5bf5ee7c129bc61e97cd023a397c790eaf32f99) Thanks [@yabasha](https://github.com/yabasha)! - Changed default output behavior to print JSON to console instead of writing to file automatically.
+  - `gex local` and `gex global` now print JSON output to console by default
+  - File output now requires explicit `-o/--out-file` flag
+  - Added shell redirection examples to documentation
+  - No breaking changes - existing `-o` functionality remains unchanged
+
 ## 0.3.3
 
 ### Patch Changes

@@ -6,6 +6,7 @@ import path from 'node:path'
 
 import { renderJson } from '../report/json.js'
 import { renderMarkdown } from '../report/md.js'
+import { renderHtml } from '../report/html.js'
 import type { OutputFormat, Report } from '../types.js'
 
 /**
@@ -25,7 +26,9 @@ export async function outputReport(
   const content =
     format === 'json'
       ? renderJson(report)
-      : renderMarkdown({ ...report, ...(markdownExtras || {}) })
+      : format === 'html'
+        ? renderHtml({ ...report, ...(markdownExtras || {}) })
+        : renderMarkdown({ ...report, ...(markdownExtras || {}) })
 
   if (outFile) {
     const outDir = path.dirname(outFile)

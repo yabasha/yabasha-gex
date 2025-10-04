@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint:*)",
+      "Bash(npm test)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm test:*)",
+      "Bash(node:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh api:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(cat:*)",
+      "Bash(git tag:*)",
+      "Bash(npx changeset:*)",
+      "Bash(gh pr list:*)",
+      "Bash(git pull:*)",
+      "Bash(npm outdated)",
+      "Bash(npm update)",
+      "Bash(npm audit:*)",
+      "Bash(npm install:*)",
+      "Bash(git stash:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(npm info:*)",
+      "Bash(./dist/cli.cjs --help)",
+      "Bash(./dist/cli.cjs local:*)",
+      "Bash(git rm:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(./dist/cli.cjs --version)",
+      "Bash(gh release create:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,18 +1,18 @@
 /**
- * @fileoverview CLI command definitions and handlers
+ * @fileoverview CLI command definitions and handlers for Bun runtime
  */
 
 import path from 'node:path'
 
 import { Command } from 'commander'
 
-import type { OutputFormat } from '../types.js'
+import type { OutputFormat } from '../../shared/types.js'
+import { installFromReport, printFromReport } from '../../shared/cli/install.js'
+import { outputReport } from '../../shared/cli/output.js'
+import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
+import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
-import { installFromReport, printFromReport } from './install.js'
-import { outputReport } from './output.js'
-import { isMarkdownReportFile, loadReportFromFile } from './parser.js'
 import { produceReport } from './report.js'
-import { ASCII_BANNER, getToolVersion } from './utils.js'
 
 /**
  * Adds common options to a command
@@ -30,7 +30,7 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
       'json',
     )
     .option('-o, --out-file <path>', 'Write report to file')
-    .option('--full-tree', 'Include full npm ls tree (omit depth=0 default)', false)
+    .option('--full-tree', 'Include full bun pm ls tree (when available)', false)
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
@@ -48,7 +48,7 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
 export function createLocalCommand(program: Command): Command {
   const localCmd = program
     .command('local', { isDefault: true })
-    .description("Generate a report for the current project's dependencies")
+    .description("Generate a report for the current Bun project's dependencies")
 
   addCommonOptions(localCmd, { allowOmitDev: true })
 
@@ -83,7 +83,7 @@ export function createLocalCommand(program: Command): Command {
 export function createGlobalCommand(program: Command): Command {
   const globalCmd = program
     .command('global')
-    .description('Generate a report of globally installed packages')
+    .description('Generate a report of globally installed Bun packages')
 
   addCommonOptions(globalCmd, { allowOmitDev: false })
 
@@ -119,13 +119,13 @@ export function createReadCommand(program: Command): Command {
     .description(
       'Read a previously generated report (JSON or Markdown) and either print package names or install them',
     )
-    .argument('[report]', 'Path to report file (JSON or Markdown)', 'gex-report.json')
+    .argument('[report]', 'Path to report file (JSON or Markdown)', 'bun-report.json')
     .option('-r, --report <path>', 'Path to report file (JSON or Markdown)')
     .option('-p, --print', 'Print package names/versions from the report (default)', false)
-    .option('-i, --install', 'Install packages from the report', false)
+    .option('-i, --install', 'Install packages from the report using Bun', false)
 
   readCmd.action(async (reportArg: string | undefined, opts: any) => {
-    const chosen = (opts.report as string | undefined) || reportArg || 'gex-report.json'
+    const chosen = (opts.report as string | undefined) || reportArg || 'bun-report.json'
     const reportPath = path.resolve(process.cwd(), chosen)
 
     try {
@@ -138,13 +138,13 @@ export function createReadCommand(program: Command): Command {
         printFromReport(parsed)
       }
       if (doInstall) {
-        await installFromReport(parsed, { cwd: process.cwd(), packageManager: 'npm' })
+        await installFromReport(parsed, { cwd: process.cwd(), packageManager: 'bun' })
       }
     } catch (err: any) {
       const isMd = isMarkdownReportFile(reportPath)
       const hint = isMd
-        ? 'Try generating a JSON report with: gex global -f json -o global.json, then: gex read global.json'
-        : 'Specify a report path with: gex read <path-to-report.json>'
+        ? 'Try generating a JSON report with: gex-bun global -f json -o global.json, then: gex-bun read global.json'
+        : 'Specify a report path with: gex-bun read <path-to-report.json>'
       console.error(`Failed to read report at ${reportPath}: ${err?.message || err}`)
       console.error(hint)
       process.exitCode = 1
@@ -155,14 +155,14 @@ export function createReadCommand(program: Command): Command {
 }
 
 /**
- * Creates and configures the main CLI program
+ * Creates and configures the main CLI program for Bun runtime
  *
  * @returns Configured Commander program
  */
 export async function createProgram(): Promise<Command> {
   const program = new Command()
-    .name('gex')
-    .description('GEX: Dependency auditing and documentation for Node.js (local and global).')
+    .name('gex-bun')
+    .description('GEX: Dependency auditing and documentation for Bun (local and global).')
     .version(await getToolVersion())
 
   program.addHelpText('beforeAll', `\n${ASCII_BANNER}`)

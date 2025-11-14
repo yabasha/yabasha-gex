@@ -4,9 +4,9 @@ import { promisify } from 'node:util'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Report } from './types.js'
-import { run } from './cli.js'
-import { npmLs, npmRootGlobal } from './npm.js'
+import type { Report } from './shared/types.js'
+import { run } from './runtimes/node/cli.js'
+import { npmLs, npmRootGlobal } from './runtimes/node/package-manager.js'
 
 vi.mock('node:fs/promises')
 vi.mock('node:child_process', () => ({
@@ -15,7 +15,7 @@ vi.mock('node:child_process', () => ({
 vi.mock('node:util', () => ({
   promisify: vi.fn(),
 }))
-vi.mock('./npm.js')
+vi.mock('./runtimes/node/package-manager.js')
 
 const getToolVersion = async () => '0.3.2'
 

@@ -6,13 +6,13 @@ import path from 'node:path'
 
 import { Command } from 'commander'
 
-import type { OutputFormat } from '../types.js'
+import type { OutputFormat } from '../../shared/types.js'
+import { installFromReport, printFromReport } from '../../shared/cli/install.js'
+import { outputReport } from '../../shared/cli/output.js'
+import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
+import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
-import { installFromReport, printFromReport } from './install.js'
-import { outputReport } from './output.js'
-import { isMarkdownReportFile, loadReportFromFile } from './parser.js'
 import { produceReport } from './report.js'
-import { ASCII_BANNER, getToolVersion } from './utils.js'
 
 /**
  * Adds common options to a command

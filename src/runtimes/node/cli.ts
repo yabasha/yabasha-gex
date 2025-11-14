@@ -1,18 +1,17 @@
 /**
- * @fileoverview Main CLI entry point for GEX dependency auditing tool
- * Delegates to the Node.js runtime CLI for backward compatibility
+ * @fileoverview Node.js CLI entry point for GEX dependency auditing tool
  */
 
-import { run as runNodeCLI } from './runtimes/node/cli.js'
+import { createProgram } from './commands.js'
 
 /**
- * Main CLI runner function (delegates to Node.js runtime)
+ * Main CLI runner function
  *
  * @param argv - Command line arguments (defaults to process.argv)
  */
 export async function run(argv = process.argv): Promise<void> {
-  // Delegate to the Node.js runtime CLI for backward compatibility
-  return runNodeCLI(argv)
+  const program = await createProgram()
+  await program.parseAsync(argv)
 }
 
 const isMainModule = (() => {

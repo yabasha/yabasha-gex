@@ -8,17 +8,17 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import path from 'node:path'
 
-import { npmLs, npmRootGlobal } from './npm.js'
-import { buildReportFromNpmTree } from './transform.js'
-import { renderJson } from './report/json.js'
-import { renderMarkdown } from './report/md.js'
-import { npmRateLimiter, validateFilePath, validateOutputFormat } from './validators.js'
-import type { OutputFormat, PackageInfo, Report } from './types.js'
+import { npmLs, npmRootGlobal } from './runtimes/node/package-manager.js'
+import { buildReportFromNpmTree } from './shared/transform.js'
+import { renderJson } from './shared/report/json.js'
+import { renderMarkdown } from './shared/report/md.js'
+import { npmRateLimiter, validateFilePath, validateOutputFormat } from './shared/validators.js'
+import type { OutputFormat, PackageInfo, Report } from './shared/types.js'
 
 const execFileAsync = promisify(execFile)
 
-export type { Report, PackageInfo, OutputFormat } from './types.js'
-export { ValidationError } from './validators.js'
+export type { Report, PackageInfo, OutputFormat } from './shared/types.js'
+export { ValidationError } from './shared/validators.js'
 
 /**
  * Options for generating local dependency reports

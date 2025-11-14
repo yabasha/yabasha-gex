@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Report } from './types.js'
+import type { Report } from './shared/types.js'
 
 import { formatReport, ValidationError } from './index.js'
 

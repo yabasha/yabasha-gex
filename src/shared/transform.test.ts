@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { buildReportFromNpmTree } from './shared/transform.js'
+import { buildReportFromNpmTree } from './transform.js'
 
 vi.mock('node:fs/promises')
 const mockReadFile = vi.mocked(readFile)

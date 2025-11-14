@@ -12,7 +12,7 @@ import {
   validatePackageName,
   validateVersion,
   ValidationError,
-} from './shared/validators.js'
+} from './validators.js'
 
 describe('validators', () => {
   describe('ValidationError', () => {

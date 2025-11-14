@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { constants as fsConstants, type Dirent } from 'node:fs'
 import { access, readFile, readdir, stat } from 'node:fs/promises'
+import { promisify } from 'node:util'
 
 export type BunPmLsOptions = {
   global?: boolean
@@ -92,6 +93,46 @@ export async function bunPmRootLocal(cwd: string = process.cwd()): Promise<strin
     return process.env.GEX_BUN_LOCAL_ROOT
   }
   return path.join(cwd, 'node_modules')
+}
+
+export type BunUpdateOptions = {
+  cwd: string
+  global?: boolean
+  packages?: string[]
+}
+
+export async function bunUpdate(options: BunUpdateOptions): Promise<void> {
+  const execFileAsync = await getExecFileAsync()
+  const packages = options.packages && options.packages.length > 0 ? options.packages : []
+
+  if (options.global) {
+    const targets = packages.length > 0 ? packages : []
+    const list = targets.length > 0 ? targets : []
+    const cmdPackages = list.map((name) => `${name}@latest`)
+    try {
+      await execFileAsync('bun', ['add', '-g', ...cmdPackages], {
+        cwd: options.cwd,
+        maxBuffer: 10 * 1024 * 1024,
+      })
+    } catch (error: any) {
+      const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : ''
+      throw new Error(`bun add -g failed: ${stderr || error?.message || 'unknown error'}`)
+    }
+    return
+  }
+
+  const args = ['update']
+  if (packages.length > 0) args.push(...packages)
+
+  try {
+    await execFileAsync('bun', args, {
+      cwd: options.cwd,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+  } catch (error: any) {
+    const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : ''
+    throw new Error(`bun update failed: ${stderr || error?.message || 'unknown error'}`)
+  }
 }
 
 async function collectPackagesForNames(
@@ -241,4 +282,13 @@ function getGlobalRootCandidates(): string[] {
   maybeAdd('/opt/homebrew/var/bun/install/global/node_modules')
 
   return Array.from(candidates)
+}
+
+async function getExecFileAsync(): Promise<(
+  command: string,
+  args?: readonly string[] | null,
+  options?: any,
+) => Promise<{ stdout: string; stderr: string }>> {
+  const { execFile } = await import('node:child_process')
+  return promisify(execFile) as any
 }

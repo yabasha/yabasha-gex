@@ -10,6 +10,8 @@ import type { OutputFormat } from '../../shared/types.js'
 import { installFromReport, printFromReport } from '../../shared/cli/install.js'
 import { outputReport } from '../../shared/cli/output.js'
 import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
+import { normalizeUpdateSelection, handleOutdatedWorkflow } from '../../shared/cli/outdated.js'
+import { npmOutdated, npmUpdate } from '../../shared/npm-cli.js'
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
 import { produceReport } from './report.js'
@@ -31,6 +33,11 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
     )
     .option('-o, --out-file <path>', 'Write report to file')
     .option('--full-tree', 'Include full npm ls tree (omit depth=0 default)', false)
+    .option('-c, --check-outdated', 'List outdated packages instead of printing the report', false)
+    .option(
+      '-u, --update-outdated [packages...]',
+      'Update outdated packages (omit package names to update every package)',
+    )
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
@@ -57,6 +64,23 @@ export function createLocalCommand(program: Command): Command {
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
     const omitDev = Boolean(opts.omitDev)
+    const cwd = process.cwd()
+
+    const selection = normalizeUpdateSelection(opts.updateOutdated)
+    const proceed = await handleOutdatedWorkflow({
+      checkOutdated: Boolean(opts.checkOutdated),
+      selection,
+      contextLabel: 'local',
+      outFile,
+      fetchOutdated: () => npmOutdated({ cwd }),
+      updateRunner: selection.shouldUpdate
+        ? async (packages) => {
+            await npmUpdate({ cwd, packages })
+          }
+        : undefined,
+    })
+
+    if (!proceed) return
 
     // Only set finalOutFile when explicitly provided via --out-file
     const finalOutFile = outFile
@@ -91,6 +115,23 @@ export function createGlobalCommand(program: Command): Command {
     const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
+    const cwd = process.cwd()
+
+    const selection = normalizeUpdateSelection(opts.updateOutdated)
+    const proceed = await handleOutdatedWorkflow({
+      checkOutdated: Boolean(opts.checkOutdated),
+      selection,
+      contextLabel: 'global',
+      outFile,
+      fetchOutdated: () => npmOutdated({ cwd, global: true }),
+      updateRunner: selection.shouldUpdate
+        ? async (packages) => {
+            await npmUpdate({ cwd, global: true, packages })
+          }
+        : undefined,
+    })
+
+    if (!proceed) return
 
     // Only set finalOutFile when explicitly provided via --out-file
     const finalOutFile = outFile

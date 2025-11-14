@@ -3,6 +3,7 @@
  */
 
 import path from 'node:path'
+import { readFile } from 'node:fs/promises'
 
 import { Command } from 'commander'
 
@@ -10,9 +11,15 @@ import type { OutputFormat } from '../../shared/types.js'
 import { installFromReport, printFromReport } from '../../shared/cli/install.js'
 import { outputReport } from '../../shared/cli/output.js'
 import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
+import {
+  normalizeUpdateSelection,
+  handleOutdatedWorkflow,
+  resolveOutdatedWithNpmView,
+} from '../../shared/cli/outdated.js'
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
 import { produceReport } from './report.js'
+import { bunUpdate, bunPmRootGlobal, bunPmLs } from './package-manager.js'
 
 /**
  * Adds common options to a command
@@ -31,6 +38,11 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
     )
     .option('-o, --out-file <path>', 'Write report to file')
     .option('--full-tree', 'Include full bun pm ls tree (when available)', false)
+    .option('-c, --check-outdated', 'List outdated packages instead of printing the report', false)
+    .option(
+      '-u, --update-outdated [packages...]',
+      'Update outdated packages (omit package names to update every package)',
+    )
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
@@ -57,6 +69,51 @@ export function createLocalCommand(program: Command): Command {
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
     const omitDev = Boolean(opts.omitDev)
+    const cwd = process.cwd()
+
+    const selection = normalizeUpdateSelection(opts.updateOutdated)
+    const proceed = await handleOutdatedWorkflow({
+      checkOutdated: Boolean(opts.checkOutdated),
+      selection,
+      contextLabel: 'local',
+      outFile,
+      fetchOutdated: async () => {
+        const tree = await bunPmLs({ cwd, omitDev })
+        const manifest = await readPackageManifest(cwd)
+        const declared = {
+          ...(manifest?.dependencies || {}),
+          ...(manifest?.optionalDependencies || {}),
+          ...(manifest?.devDependencies || {}),
+        }
+
+        const packages = Object.entries(tree.dependencies).map(([name, node]) => ({
+          name,
+          current: node.version,
+          declared: declared[name],
+          type: 'prod',
+        }))
+
+        if (tree.devDependencies) {
+          for (const [name, node] of Object.entries(tree.devDependencies)) {
+            packages.push({
+              name,
+              current: node.version,
+              declared: declared[name],
+              type: 'dev',
+            })
+          }
+        }
+
+        return resolveOutdatedWithNpmView(packages)
+      },
+      updateRunner: selection.shouldUpdate
+        ? async (packages) => {
+            await bunUpdate({ cwd, packages })
+          }
+        : undefined,
+    })
+
+    if (!proceed) return
 
     // Only set finalOutFile when explicitly provided via --out-file
     const finalOutFile = outFile
@@ -91,6 +148,31 @@ export function createGlobalCommand(program: Command): Command {
     const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
+    const cwd = process.cwd()
+
+    const selection = normalizeUpdateSelection(opts.updateOutdated)
+    const proceed = await handleOutdatedWorkflow({
+      checkOutdated: Boolean(opts.checkOutdated),
+      selection,
+      contextLabel: 'global',
+      outFile,
+      fetchOutdated: async () => {
+        const tree = await bunPmLs({ global: true })
+        const packages = Object.entries(tree.dependencies).map(([name, node]) => ({
+          name,
+          current: node.version,
+          type: 'global',
+        }))
+        return resolveOutdatedWithNpmView(packages)
+      },
+      updateRunner: selection.shouldUpdate
+        ? async (packages) => {
+            await bunUpdate({ cwd, global: true, packages })
+          }
+        : undefined,
+    })
+
+    if (!proceed) return
 
     // Only set finalOutFile when explicitly provided via --out-file
     const finalOutFile = outFile
@@ -172,4 +254,13 @@ export async function createProgram(): Promise<Command> {
   createReadCommand(program)
 
   return program
+}
+
+async function readPackageManifest(cwd: string): Promise<any | null> {
+  try {
+    const raw = await readFile(path.join(cwd, 'package.json'), 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }

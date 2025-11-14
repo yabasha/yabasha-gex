@@ -47,10 +47,12 @@ gex global [options]
 
 Common options:
 
-- f, --output-format <md|json> (default: json)
-- o, --out-file <path>
-- -full-tree Include the full npm ls JSON under `tree` (default uses depth=0)
-- -omit-dev Local only; exclude devDependencies
+- -f, --output-format <md|json> (default: json)
+- -o, --out-file <path>
+- --full-tree Include the full npm ls JSON under `tree` (default uses depth=0)
+- --omit-dev Local only; exclude devDependencies
+- -c, --check-outdated Print a table of outdated packages (skips console report output unless `-o` is set)
+- -u, --update-outdated [pkg1 pkg2 ...] Update outdated packages (omit names to update everything). Node CLI shells out to `npm update`, Bun CLI runs `bun update`/`bun update --global`.
 
 Examples:
 
@@ -83,6 +85,16 @@ gex read global.md -i
 # Shell redirection (alternative to -o flag)
 gex > report.json           # redirect JSON output to file
 gex global | jq '.global_packages'  # pipe output to jq for processing
+
+# Check outdated packages / update them (Node runtime)
+gex local --check-outdated                    # show outdated local deps as a table
+gex global --check-outdated                   # show outdated globals
+gex local --update-outdated                   # update every outdated local dependency
+gex local --update-outdated axios react       # update specific packages
+
+# Bun runtime uses the same flags
+gex-bun local --check-outdated
+gex-bun global --update-outdated              # updates global Bun installs via `bun update`
 ```
 
 > **Note**: Starting from v0.4.0, GEX outputs to console by default instead of creating files automatically. Use the `-o/--out-file` flag to write to a file.

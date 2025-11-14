@@ -19,7 +19,7 @@ import {
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
 import { produceReport } from './report.js'
-import { bunUpdate, bunPmRootGlobal, bunPmLs } from './package-manager.js'
+import { bunUpdate, bunPmLs } from './package-manager.js'
 
 /**
  * Adds common options to a command

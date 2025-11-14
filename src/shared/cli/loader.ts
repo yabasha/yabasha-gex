@@ -15,7 +15,7 @@ export function createLoader(message: string): Loader {
   }
 
   let index = 0
-  const interval = setInterval(() => {
+  const interval = globalThis.setInterval(() => {
     const frame = frames[index % frames.length]
     index += 1
     process.stdout.write(`\r${message} ${frame}`)
@@ -23,7 +23,7 @@ export function createLoader(message: string): Loader {
 
   return {
     stop(finalMessage) {
-      clearInterval(interval)
+      globalThis.clearInterval(interval)
       process.stdout.write('\r')
       if (finalMessage) {
         console.log(finalMessage)

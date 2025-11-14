@@ -16,6 +16,7 @@ type PackageNode = {
 
 type BunPackageTree = {
   dependencies: Record<string, PackageNode>
+  devDependencies?: Record<string, PackageNode>
   node_modules_path?: string
 }
 
@@ -27,7 +28,12 @@ const IGNORED_ENTRIES = new Set(['.bin'])
 export async function bunPmLs(options: BunPmLsOptions = {}): Promise<BunPackageTree> {
   if (options.global) {
     const root = await bunPmRootGlobal()
-    const dependencies = await collectPackagesFromNodeModules(root)
+    const manifest = await readJson(path.join(path.dirname(root), 'package.json'))
+    const selections = buildSelections(manifest, { includeDev: false })
+    const dependencies =
+      selections.prod.size > 0
+        ? await collectPackagesForNames(root, mapSelections(selections.prod))
+        : await collectPackagesFromNodeModules(root)
     return { dependencies, node_modules_path: root }
   }
 
@@ -35,33 +41,26 @@ export async function bunPmLs(options: BunPmLsOptions = {}): Promise<BunPackageT
   const nodeModulesPath = await bunPmRootLocal(cwd)
   const manifest = await readJson(path.join(cwd, 'package.json'))
   const includeDev = !options.omitDev
-  const selections = new Map<string, string | undefined>()
+  const selections = buildSelections(manifest, { includeDev })
 
-  const addAll = (record: Record<string, string> | undefined) => {
-    if (!record) return
-    for (const [name, range] of Object.entries(record)) {
-      if (!selections.has(name)) {
-        selections.set(name, range)
-      }
+  const dependencies =
+    selections.prod.size > 0
+      ? await collectPackagesForNames(nodeModulesPath, mapSelections(selections.prod))
+      : await collectPackagesFromNodeModules(nodeModulesPath)
+
+  let devDependencies: Record<string, PackageNode> | undefined
+  if (includeDev) {
+    if (selections.dev.size > 0) {
+      devDependencies = await collectPackagesForNames(
+        nodeModulesPath,
+        mapSelections(selections.dev),
+      )
+    } else {
+      devDependencies = {}
     }
   }
 
-  addAll(manifest?.dependencies)
-  if (includeDev) addAll(manifest?.devDependencies)
-  addAll(manifest?.optionalDependencies)
-
-  let dependencies: Record<string, PackageNode>
-  if (selections.size > 0) {
-    const packages = Array.from(selections.entries()).map(([name, declared]) => ({
-      name,
-      declared,
-    }))
-    dependencies = await collectPackagesForNames(nodeModulesPath, packages)
-  } else {
-    dependencies = await collectPackagesFromNodeModules(nodeModulesPath)
-  }
-
-  return { dependencies, node_modules_path: nodeModulesPath }
+  return { dependencies, devDependencies, node_modules_path: nodeModulesPath }
 }
 
 /**
@@ -159,6 +158,38 @@ async function readJson(file: string): Promise<any | null> {
 function packageDir(root: string, packageName: string): string {
   const segments = packageName.startsWith('@') ? packageName.split('/') : [packageName]
   return path.join(root, ...segments)
+}
+
+function buildSelections(
+  manifest: Record<string, any> | null,
+  { includeDev }: { includeDev: boolean },
+): { prod: Map<string, string | undefined>; dev: Map<string, string | undefined> } {
+  const prod = new Map<string, string | undefined>()
+  const dev = new Map<string, string | undefined>()
+
+  const addAll = (
+    target: Map<string, string | undefined>,
+    record: Record<string, string> | undefined,
+  ) => {
+    if (!record) return
+    for (const [name, range] of Object.entries(record)) {
+      if (!target.has(name)) {
+        target.set(name, range)
+      }
+    }
+  }
+
+  addAll(prod, manifest?.dependencies)
+  addAll(prod, manifest?.optionalDependencies)
+  if (includeDev) addAll(dev, manifest?.devDependencies)
+
+  return { prod, dev }
+}
+
+function mapSelections(
+  map: Map<string, string | undefined>,
+): { name: string; declared?: string }[] {
+  return Array.from(map.entries()).map(([name, declared]) => ({ name, declared }))
 }
 
 async function safeReadDir(dir: string): Promise<Dirent[]> {

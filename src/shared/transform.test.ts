@@ -278,5 +278,31 @@ describe('transform', () => {
         resolved_path: '/path/to/broken-package',
       })
     })
+
+    it('should honor devDependencies section in tree data', async () => {
+      const treeWithDevSections = {
+        dependencies: {
+          prod: { version: '1.0.0', path: '/deps/prod' },
+        },
+        devDependencies: {
+          dev: { version: '2.0.0', path: '/deps/dev' },
+        },
+      }
+
+      mockReadFile.mockRejectedValue(new Error('missing package.json'))
+
+      const result = await buildReportFromNpmTree(treeWithDevSections, {
+        context: 'local',
+        toolVersion: '0.3.2',
+        cwd: '/test/path',
+      })
+
+      expect(result.local_dependencies).toEqual([
+        { name: 'prod', version: '1.0.0', resolved_path: '/deps/prod' },
+      ])
+      expect(result.local_dev_dependencies).toEqual([
+        { name: 'dev', version: '2.0.0', resolved_path: '/deps/dev' },
+      ])
+    })
   })
 })

@@ -79,6 +79,8 @@ describe('bun package manager helpers', () => {
 
     expect(result.dependencies).toEqual({
       foo: { version: '1.1.0', path: '/repo/node_modules/foo' },
+    })
+    expect(result.devDependencies).toEqual({
       bar: { version: '2.2.0', path: '/repo/node_modules/bar' },
     })
   })
@@ -104,6 +106,7 @@ describe('bun package manager helpers', () => {
 
     expect(result.dependencies).toHaveProperty('foo')
     expect(result.dependencies).not.toHaveProperty('bar')
+    expect(result.devDependencies).toBeUndefined()
   })
 
   it('falls back to scanning node_modules when package.json is unavailable', async () => {
@@ -128,7 +131,15 @@ describe('bun package manager helpers', () => {
 
   it('lists global packages from the configured Bun root', async () => {
     process.env.GEX_BUN_GLOBAL_ROOT = '/global/node_modules'
-    dirEntries.set('/global/node_modules', [dirent('global-one'), dirent('@scope')])
+    addFile(
+      '/global/package.json',
+      JSON.stringify({ dependencies: { 'global-one': '^5.0.0', '@scope/pkg': '^6.0.0' } }),
+    )
+    dirEntries.set('/global/node_modules', [
+      dirent('global-one'),
+      dirent('@scope'),
+      dirent('transitive'),
+    ])
     dirEntries.set('/global/node_modules/@scope', [dirent('pkg')])
     addFile(
       '/global/node_modules/global-one/package.json',
@@ -138,12 +149,41 @@ describe('bun package manager helpers', () => {
       '/global/node_modules/@scope/pkg/package.json',
       JSON.stringify({ name: '@scope/pkg', version: '6.1.0' }),
     )
+    addFile(
+      '/global/node_modules/transitive/package.json',
+      JSON.stringify({ name: 'transitive', version: '1.0.0' }),
+    )
 
     const result = await bunPmLs({ global: true })
 
     expect(result.dependencies).toEqual({
       'global-one': { version: '5.0.0', path: '/global/node_modules/global-one' },
       '@scope/pkg': { version: '6.1.0', path: '/global/node_modules/@scope/pkg' },
+    })
+    expect(result.dependencies).not.toHaveProperty('transitive')
+    expect(result.devDependencies).toBeUndefined()
+  })
+
+  it('captures declared devDependencies even when package manifests are missing', async () => {
+    addFile(
+      '/repo/package.json',
+      JSON.stringify({
+        dependencies: { foo: '^1.0.0' },
+        devDependencies: { bar: '^2.0.0' },
+      }),
+    )
+    addFile(
+      '/repo/node_modules/foo/package.json',
+      JSON.stringify({ name: 'foo', version: '1.1.0' }),
+    )
+    // intentionally omit /repo/node_modules/bar/package.json
+
+    const result = await bunPmLs({ cwd: '/repo' })
+
+    expect(result.devDependencies).toHaveProperty('bar')
+    expect(result.devDependencies?.bar).toEqual({
+      version: '^2.0.0',
+      path: '/repo/node_modules/bar',
     })
   })
 })

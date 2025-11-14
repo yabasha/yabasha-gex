@@ -85,15 +85,30 @@ export async function buildReportFromNpmTree(tree: any, opts: NormalizeOptions):
     if (pkgMeta?.version) report.project_version = pkgMeta.version
 
     const depsObj = tree?.dependencies as Record<string, any> | undefined
-    const items = toPkgArray(depsObj)
-    const devKeys = new Set(Object.keys((pkgMeta?.devDependencies as Record<string, string>) || {}))
+    const devDepsObj = tree?.devDependencies as Record<string, any> | undefined
+    const prodItems = toPkgArray(depsObj)
+    const treeDevItems = toPkgArray(devDepsObj)
 
-    for (const { name, node } of items) {
+    if (treeDevItems.length > 0) {
+      for (const { name, node } of treeDevItems) {
+        const version = (node && node.version) || ''
+        const resolvedPath =
+          (node && node.path) || path.join(opts.cwd || process.cwd(), 'node_modules', name)
+        report.local_dev_dependencies.push({ name, version, resolved_path: resolvedPath })
+      }
+    }
+
+    const devKeys =
+      treeDevItems.length > 0
+        ? new Set(treeDevItems.map((entry) => entry.name))
+        : new Set(Object.keys((pkgMeta?.devDependencies as Record<string, string>) || {}))
+
+    for (const { name, node } of prodItems) {
       const version = (node && node.version) || ''
       const resolvedPath =
         (node && node.path) || path.join(opts.cwd || process.cwd(), 'node_modules', name)
       const pkg: PackageInfo = { name, version, resolved_path: resolvedPath }
-      if (devKeys.has(name)) {
+      if (!treeDevItems.length && devKeys.has(name)) {
         report.local_dev_dependencies.push(pkg)
       } else {
         report.local_dependencies.push(pkg)

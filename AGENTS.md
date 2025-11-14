@@ -42,6 +42,7 @@
 
 - Markdown exports in `shared/report/md.ts` mirror the JSON structure (sections for global/local/dev) and `shared/cli/parser.ts` parses them back into the same schema. Keep column ordering and headers stable so round-trips succeed.
 - Bun's scanners (`src/runtimes/bun/package-manager.ts`) inspect `node_modules` and Bun's global install directory directly; do not regress the normalized dependency map they feed into `buildReportFromNpmTree`.
+- Local Bun scans now mimic `bun pm ls` by separating devDependencies from production dependencies. The returned tree includes a `devDependencies` section so `local_dev_dependencies` is populated even when `package.json` metadata is missing.
 
 ## Testing Guidelines
 

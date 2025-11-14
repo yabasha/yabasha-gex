@@ -51,8 +51,8 @@ Common options:
 - -o, --out-file <path>
 - --full-tree Include the full npm ls JSON under `tree` (default uses depth=0)
 - --omit-dev Local only; exclude devDependencies
-- -c, --check-outdated Print a table of outdated packages (skips console report output unless `-o` is set)
-- -u, --update-outdated [pkg1 pkg2 ...] Update outdated packages (omit names to update everything). Node CLI shells out to `npm update`, Bun CLI runs `bun update`/`bun update --global`.
+- -c, --check-outdated Print a table of outdated packages (shows a lightweight spinner while checking; skips console report output unless `-o` is set so you can write the report to file instead)
+- -u, --update-outdated [pkg1 pkg2 ...] Update outdated packages (omit names to update everything). Node CLI shells out to `npm update`; Bun CLI mirrors `bun update` for locals and reinstalls globals via `bun add -g pkg@latest`.
 
 Examples:
 
@@ -88,13 +88,13 @@ gex global | jq '.global_packages'  # pipe output to jq for processing
 
 # Check outdated packages / update them (Node runtime)
 gex local --check-outdated                    # show outdated local deps as a table
-gex global --check-outdated                   # show outdated globals
+gex global -c                                 # short flag works too
 gex local --update-outdated                   # update every outdated local dependency
-gex local --update-outdated axios react       # update specific packages
+gex local -u axios react                      # update specific packages
 
 # Bun runtime uses the same flags
 gex-bun local --check-outdated
-gex-bun global --update-outdated              # updates global Bun installs via `bun update`
+gex-bun global --update-outdated              # updates global Bun installs via `bun update`/`bun add -g`
 ```
 
 > **Note**: Starting from v0.4.0, GEX outputs to console by default instead of creating files automatically. Use the `-o/--out-file` flag to write to a file.
@@ -136,6 +136,12 @@ Example (truncated):
   ]
 }
 ```
+
+## Outdated workflow
+
+- Use `-c/--check-outdated` to produce a focused table of outdated packages. GEX shows a lightweight spinner while it queries npm, then prints `Name`, `Current`, `Wanted`, `Latest`, and `Type`. Combine the flag with `-o report.json` if you still need the report file.
+- Use `-u/--update-outdated` to upgrade packages. Without arguments every outdated package is updated; include package names to only bump a subset (e.g., `-u axios react`). Node CLI shells out to `npm update`, whereas Bun CLI runs `bun update` for local projects and `bun add -g pkg@latest` for globals.
+- After updating you can immediately rerun `-c` to verify everything is current—reports generated with `-o` will now include the updated versions.
 
 ## Production usage
 

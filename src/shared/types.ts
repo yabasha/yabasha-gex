@@ -41,4 +41,4 @@ export type Report = {
 /**
  * Supported output formats for reports
  */
-export type OutputFormat = 'json' | 'md'
+export type OutputFormat = 'json' | 'md' | 'html'

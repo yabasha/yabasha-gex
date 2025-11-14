@@ -1,5 +1,13 @@
 # @yabasha/gex
 
+## 1.0.1
+
+### Patch Changes
+
+- b94376f: feat: add HTML output format
+
+  Added support for generating dependency reports in HTML format with styled tables and project information.
+
 ## 1.0.0
 
 ### Major Changes

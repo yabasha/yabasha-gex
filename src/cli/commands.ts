@@ -25,8 +25,12 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
   cmd
     .option(
       '-f, --output-format <format>',
-      'Output format: md or json',
-      (val) => (val === 'md' ? 'md' : 'json'),
+      'Output format: json, md, or html',
+      (val) => {
+        if (val === 'md') return 'md'
+        if (val === 'html') return 'html'
+        return 'json'
+      },
       'json',
     )
     .option('-o, --out-file <path>', 'Write report to file')

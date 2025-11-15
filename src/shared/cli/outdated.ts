@@ -1,5 +1,6 @@
 import type { OutdatedInfo } from '../npm-cli.js'
 import { npmViewVersion } from '../npm-cli.js'
+
 import { createLoader } from './loader.js'
 
 export type OutdatedEntry = OutdatedInfo
@@ -19,7 +20,11 @@ export function normalizeUpdateSelection(value: unknown): OutdatedSelection {
   }
   const packages = Array.isArray(value) ? value : typeof value === 'string' ? [value] : []
   const normalized = packages
-    .flatMap((entry) => String(entry).split(',').map((part) => part.trim()))
+    .flatMap((entry) =>
+      String(entry)
+        .split(',')
+        .map((part) => part.trim()),
+    )
     .filter(Boolean)
 
   return {
@@ -62,9 +67,16 @@ export type OutdatedWorkflowOptions = {
   updateRunner?: (packages: string[]) => Promise<void>
 }
 
-export async function handleOutdatedWorkflow(opts: OutdatedWorkflowOptions): Promise<boolean> {
+export type OutdatedWorkflowResult = {
+  proceed: boolean
+  outdated: OutdatedEntry[]
+}
+
+export async function handleOutdatedWorkflow(
+  opts: OutdatedWorkflowOptions,
+): Promise<OutdatedWorkflowResult> {
   if (!opts.checkOutdated && !opts.selection.shouldUpdate) {
-    return true
+    return { proceed: true, outdated: [] }
   }
 
   let fetchLoader: ReturnType<typeof createLoader> | undefined
@@ -73,14 +85,6 @@ export async function handleOutdatedWorkflow(opts: OutdatedWorkflowOptions): Pro
   }
   const outdated = await opts.fetchOutdated()
   fetchLoader?.stop('Finished checking outdated packages.')
-
-  if (opts.checkOutdated) {
-    if (outdated.length === 0) {
-      console.log(`All ${opts.contextLabel} packages are up to date.`)
-    } else {
-      console.log(formatOutdatedTable(outdated))
-    }
-  }
 
   if (opts.selection.shouldUpdate && opts.updateRunner) {
     const packagesToUpdate = opts.selection.updateAll
@@ -100,13 +104,8 @@ export async function handleOutdatedWorkflow(opts: OutdatedWorkflowOptions): Pro
     }
   }
 
-  if (opts.checkOutdated || opts.selection.shouldUpdate) {
-    if (!opts.outFile) {
-      return false
-    }
-  }
-
-  return true
+  const proceed = !((opts.checkOutdated || opts.selection.shouldUpdate) && !opts.outFile)
+  return { proceed, outdated }
 }
 
 export type InstalledPackageInput = {

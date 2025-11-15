@@ -15,6 +15,7 @@ import {
   normalizeUpdateSelection,
   handleOutdatedWorkflow,
   resolveOutdatedWithNpmView,
+  formatOutdatedTable,
 } from '../../shared/cli/outdated.js'
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
@@ -72,7 +73,7 @@ export function createLocalCommand(program: Command): Command {
     const cwd = process.cwd()
 
     const selection = normalizeUpdateSelection(opts.updateOutdated)
-    const proceed = await handleOutdatedWorkflow({
+    const result = await handleOutdatedWorkflow({
       checkOutdated: Boolean(opts.checkOutdated),
       selection,
       contextLabel: 'local',
@@ -112,8 +113,11 @@ export function createLocalCommand(program: Command): Command {
           }
         : undefined,
     })
-
-    if (!proceed) return
+    if (opts.checkOutdated) {
+      if (result.outdated.length === 0) console.log('All local packages are up to date.')
+      else console.log(formatOutdatedTable(result.outdated))
+    }
+    if (!result.proceed) return
 
     // Only set finalOutFile when explicitly provided via --out-file
     const finalOutFile = outFile
@@ -151,7 +155,7 @@ export function createGlobalCommand(program: Command): Command {
     const cwd = process.cwd()
 
     const selection = normalizeUpdateSelection(opts.updateOutdated)
-    const proceed = await handleOutdatedWorkflow({
+    const result = await handleOutdatedWorkflow({
       checkOutdated: Boolean(opts.checkOutdated),
       selection,
       contextLabel: 'global',
@@ -171,8 +175,11 @@ export function createGlobalCommand(program: Command): Command {
           }
         : undefined,
     })
-
-    if (!proceed) return
+    if (opts.checkOutdated) {
+      if (result.outdated.length === 0) console.log('All global packages are up to date.')
+      else console.log(formatOutdatedTable(result.outdated))
+    }
+    if (!result.proceed) return
 
     // Only set finalOutFile when explicitly provided via --out-file
     const finalOutFile = outFile

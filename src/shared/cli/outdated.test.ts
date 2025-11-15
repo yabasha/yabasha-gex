@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { npmViewVersion } from '../npm-cli.js'
+
 import {
   formatOutdatedTable,
   handleOutdatedWorkflow,
   normalizeUpdateSelection,
   resolveOutdatedWithNpmView,
 } from './outdated.js'
-import { npmViewVersion } from '../npm-cli.js'
 
 vi.mock('../npm-cli.js', () => ({
   npmViewVersion: vi.fn(),
@@ -49,7 +50,7 @@ describe('outdated utils', () => {
 
   it('handles workflow with check only', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const proceed = await handleOutdatedWorkflow({
+    const result = await handleOutdatedWorkflow({
       checkOutdated: true,
       selection: { shouldUpdate: false, updateAll: false, packages: [] },
       contextLabel: 'local',
@@ -60,7 +61,8 @@ describe('outdated utils', () => {
     })
 
     expect(logSpy).toHaveBeenCalled()
-    expect(proceed).toBe(false)
+    expect(result.proceed).toBe(false)
+    expect(result.outdated).toHaveLength(1)
   })
 
   it('resolves outdated packages via npm view', async () => {

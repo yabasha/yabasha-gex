@@ -1,6 +1,6 @@
 {
   "name": "@yabasha/gex",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "private": false,
   "description": "A CLI tool for auditing and documenting your Node.js package environment, generating comprehensive reports of global and local dependencies.",
   "type": "module",

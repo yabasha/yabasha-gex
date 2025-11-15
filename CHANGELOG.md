@@ -1,5 +1,15 @@
 # @yabasha/gex
 
+## 1.3.4
+
+### Patch Changes
+
+- chore: add npm-style outdated workflow with CLI loader, Bun parity, and README clarifications. Highlights:
+  - `-c/--check-outdated` and `-u/--update-outdated` work on both Node and Bun CLIs with progress spinners.
+  - Bun runtime inspects its own package tree (local/global) and reinstalls outdated globals via `bun add -g pkg@latest`.
+  - README documents the workflow so npmjs users see the latest instructions.
+  - Loader helper is shared so CI/terminals get feedback while updating.
+
 ## 1.0.1
 
 ### Patch Changes

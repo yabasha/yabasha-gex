@@ -37,15 +37,38 @@ node dist/cli.cjs --help
 
 ## Usage
 
-Synopsis:
+### Top-level entry: `gex` (interactive selector)
+
+Starting with v1.3.5, the primary `gex` binary is an interactive launcher that lets you choose which runtime to use:
 
 ```bash
-gex [options]          # defaults to: gex local
-gex local [options]
-gex global [options]
+gex
 ```
 
-Common options:
+You will be prompted with:
+
+```text
+Select a runtime to use:
+  1) gex-bun (Bun package manager)
+  2) gex-npm (npm / Node.js package manager)
+```
+
+Enter `1` for the Bun-based CLI (`gex-bun`) or `2` for the Node/npm-based CLI (`gex-npm`). Any additional arguments you pass after `gex` are forwarded to the selected runtime, e.g.:
+
+```bash
+gex local --check-outdated   # choose Bun or npm, then run `local` on that runtime
+```
+
+### Direct runtimes: `gex-npm` (Node) and `gex-bun` (Bun)
+
+You can still call each runtime directly without the interactive selector:
+
+```bash
+gex-npm [command] [options]   # Node.js / npm runtime (formerly `gex`)
+gex-bun [command] [options]   # Bun runtime
+```
+
+Common command options:
 
 - -f, --output-format <md|json> (default: json)
 - -o, --out-file <path>
@@ -54,45 +77,45 @@ Common options:
 - -c, --check-outdated Print a table of outdated packages (shows a lightweight spinner while checking; skips console report output unless `-o` is set so you can write the report to file instead)
 - -u, --update-outdated [pkg1 pkg2 ...] Update outdated packages (omit names to update everything). Node CLI shells out to `npm update`; Bun CLI mirrors `bun update` for locals and reinstalls globals via `bun add -g pkg@latest`.
 
-Examples:
+Examples (Node/npm runtime via `gex-npm`):
 
 ```bash
 # Local (default): JSON output to console
-gex                  # prints JSON to console (same as: gex local)
-gex -o report.json   # writes JSON to file
-gex -f md            # prints markdown to console
-gex -f md -o report.md  # writes markdown to file
+gex-npm                 # prints JSON to console (same as: gex-npm local)
+gex-npm -o report.json  # writes JSON to file
+gex-npm -f md           # prints markdown to console
+gex-npm -f md -o report.md  # writes markdown to file
 
 # Local: exclude devDependencies
-gex local --omit-dev    # prints JSON to console
-gex local --omit-dev -o deps.json  # writes JSON to file
+gex-npm local --omit-dev          # prints JSON to console
+gex-npm local --omit-dev -o deps.json  # writes JSON to file
 
 # Global packages
-gex global              # prints JSON to console
-gex global -o global.json  # writes JSON to file
-gex global -f md        # prints markdown to console
+gex-npm global                    # prints JSON to console
+gex-npm global -o global.json     # writes JSON to file
+gex-npm global -f md              # prints markdown to console
 
 # Read a previous report (JSON or Markdown)
 # Default prints names@versions; add -i to install
 # Positional path or -r/--report are accepted
 # JSON
-gex read
-gex read -r path/to/report.json -i
+gex-npm read
+gex-npm read -r path/to/report.json -i
 # Markdown
-gex read global.md
-gex read global.md -i
+gex-npm read global.md
+gex-npm read global.md -i
 
 # Shell redirection (alternative to -o flag)
-gex > report.json           # redirect JSON output to file
-gex global | jq '.global_packages'  # pipe output to jq for processing
+gex-npm > report.json                # redirect JSON output to file
+gex-npm global | jq '.global_packages'  # pipe output to jq for processing
 
 # Check outdated packages / update them (Node runtime)
-gex local --check-outdated                    # show outdated local deps as a table
-gex global -c                                 # short flag works too
-gex local --update-outdated                   # update every outdated local dependency
-gex local -u axios react                      # update specific packages
+gex-npm local --check-outdated                    # show outdated local deps as a table
+gex-npm global -c                                 # short flag works too
+gex-npm local --update-outdated                   # update every outdated local dependency
+gex-npm local -u axios react                      # update specific packages
 
-# Bun runtime uses the same flags
+# Bun runtime uses the same flags with Bun semantics
 gex-bun local --check-outdated
 gex-bun global --update-outdated              # updates global Bun installs via `bun update`/`bun add -g`
 ```

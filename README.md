@@ -37,31 +37,55 @@ node dist/cli.cjs --help
 
 ## Usage
 
-### Top-level entry: `gex` (interactive selector)
+### Top-level entry: `gex` (interactive launcher)
 
-Starting with v1.3.6, the primary `gex` binary is an interactive launcher that lets you choose which runtime to use:
+Starting with v1.3.6, the primary `gex` binary is an interactive launcher that lets you choose both:
+
+- Which runtime to use: Node/npm (`gex-node`) or Bun (`gex-bun`)
+- Which command to run: `local`, `global`, or `read`
+
+Run:
 
 ```bash
 gex
 ```
 
-You will be prompted with:
+You will see a menu similar to:
 
 ```text
-Select a runtime to use:
-  1) gex-bun (Bun package manager)
-  2) gex-npm (npm / Node.js package manager)
+GEX interactive launcher
+Choose a runtime and command to run:
+
+  1) gex-node local  – Node (npm) local project report
+  2) gex-node global – Node (npm) global packages report
+  3) gex-node read   – Node (npm) read existing report
+  4) gex-bun local   – Bun local project report
+  5) gex-bun global  – Bun global packages report
+  6) gex-bun read    – Bun read existing report
+  q) Quit without running anything
 ```
 
-Enter `1` for the Bun-based CLI (`gex-bun`) or `2` for the Node/npm-based CLI (`gex-npm`). The top-level `gex` command only shows this menu and a short hint; it does **not** execute any audit itself. To actually run commands, invoke `gex-bun` or `gex-npm` directly (see below).
+After selecting an option (for example, `1`), GEX shows the base command and asks for any extra flags you want to include:
 
-### Direct runtimes: `gex-npm` (Node) and `gex-bun` (Bun)
+```text
+Selected: gex-node local
+Enter extra flags/arguments for "gex-node local" (or press Enter for none):
+```
 
-You can still call each runtime directly without the interactive selector:
+Anything you type here is used to build and execute the final command. For example:
+
+- Input: `--full-tree -f md -o report.md`
+- Executed command: `gex-node local --full-tree -f md -o report.md`
+
+If you run `gex` **with arguments** (for example `gex local --check-outdated`), it behaves like `gex-node` for backward compatibility and forwards those arguments to the Node runtime.
+
+### Direct runtimes: `gex-node` (Node) and `gex-bun` (Bun)
+
+You can also call each runtime directly without the interactive launcher:
 
 ```bash
-gex-npm [command] [options]   # Node.js / npm runtime (formerly `gex`)
-gex-bun [command] [options]   # Bun runtime
+gex-node [command] [options]   # Node.js / npm runtime (formerly `gex`)
+gex-bun [command] [options]    # Bun runtime
 ```
 
 Common command options:
@@ -73,43 +97,43 @@ Common command options:
 - -c, --check-outdated Print a table of outdated packages (shows a lightweight spinner while checking; skips console report output unless `-o` is set so you can write the report to file instead)
 - -u, --update-outdated [pkg1 pkg2 ...] Update outdated packages (omit names to update everything). Node CLI shells out to `npm update`; Bun CLI mirrors `bun update` for locals and reinstalls globals via `bun add -g pkg@latest`.
 
-Examples (Node/npm runtime via `gex-npm`):
+Examples (Node/npm runtime via `gex-node`):
 
 ```bash
 # Local (default): JSON output to console
-gex-npm                 # prints JSON to console (same as: gex-npm local)
-gex-npm -o report.json  # writes JSON to file
-gex-npm -f md           # prints markdown to console
-gex-npm -f md -o report.md  # writes markdown to file
+gex-node                 # prints JSON to console (same as: gex-node local)
+gex-node -o report.json  # writes JSON to file
+gex-node -f md           # prints markdown to console
+gex-node -f md -o report.md  # writes markdown to file
 
 # Local: exclude devDependencies
-gex-npm local --omit-dev          # prints JSON to console
-gex-npm local --omit-dev -o deps.json  # writes JSON to file
+gex-node local --omit-dev              # prints JSON to console
+gex-node local --omit-dev -o deps.json  # writes JSON to file
 
 # Global packages
-gex-npm global                    # prints JSON to console
-gex-npm global -o global.json     # writes JSON to file
-gex-npm global -f md              # prints markdown to console
+gex-node global                        # prints JSON to console
+gex-node global -o global.json         # writes JSON to file
+gex-node global -f md                  # prints markdown to console
 
 # Read a previous report (JSON or Markdown)
 # Default prints names@versions; add -i to install
 # Positional path or -r/--report are accepted
 # JSON
-gex-npm read
-gex-npm read -r path/to/report.json -i
+gex-node read
+gex-node read -r path/to/report.json -i
 # Markdown
-gex-npm read global.md
-gex-npm read global.md -i
+gex-node read global.md
+gex-node read global.md -i
 
 # Shell redirection (alternative to -o flag)
-gex-npm > report.json                # redirect JSON output to file
-gex-npm global | jq '.global_packages'  # pipe output to jq for processing
+gex-node > report.json                     # redirect JSON output to file
+gex-node global | jq '.global_packages'    # pipe output to jq for processing
 
 # Check outdated packages / update them (Node runtime)
-gex-npm local --check-outdated                    # show outdated local deps as a table
-gex-npm global -c                                 # short flag works too
-gex-npm local --update-outdated                   # update every outdated local dependency
-gex-npm local -u axios react                      # update specific packages
+gex-node local --check-outdated                    # show outdated local deps as a table
+gex-node global -c                                 # short flag works too
+gex-node local --update-outdated                   # update every outdated local dependency
+gex-node local -u axios react                      # update specific packages
 
 # Bun runtime uses the same flags with Bun semantics
 gex-bun local --check-outdated

@@ -1,91 +1,232 @@
 /**
- * @fileoverview Main CLI entry point for GEX dependency auditing tool
+ * @fileoverview Main CLI entry point for GEX dependency auditing tool.
  *
  * When invoked without subcommands or flags (bare `gex`), this entrypoint
- * presents an interactive selector so users can choose between the npm/Node
- * runtime and the Bun runtime:
+ * presents an interactive menu so users can choose a runtime (Node/npm or Bun)
+ * and a command (`local`, `global`, or `read`). The selected command is then
+ * executed via the appropriate runtime-specific CLI (`gex-node` or `gex-bun`),
+ * including any additional flags entered in the prompt.
  *
- *   1) gex-bun
- *   2) gex-npm
+ * When invoked with arguments (for backward compatibility), `gex` forwards the
+ * full argv to the Node runtime CLI, behaving like `gex-node`.
  */
 
 import readline from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
 
-type RuntimeChoice = 'bun' | 'npm' | null
+import { run as runNodeCli } from './runtimes/node/cli.js'
+import { run as runBunCli } from './runtimes/bun/cli.js'
+
+type RuntimeKind = 'node' | 'bun'
+type RuntimeCommand = 'local' | 'global' | 'read'
 
 interface RuntimeSelectionIO {
   input?: Readable
   output?: Writable
 }
 
-async function promptRuntimeSelection(io: RuntimeSelectionIO = {}): Promise<RuntimeChoice> {
-  const input = io.input ?? process.stdin
-  const output = io.output ?? process.stdout
+interface MenuItem {
+  id: string
+  runtime: RuntimeKind
+  command: RuntimeCommand
+  label: string
+}
 
-  return new Promise<RuntimeChoice>((resolve) => {
+const MENU_ITEMS: MenuItem[] = [
+  {
+    id: '1',
+    runtime: 'node',
+    command: 'local',
+    label: 'gex-node local  – Node (npm) local project report',
+  },
+  {
+    id: '2',
+    runtime: 'node',
+    command: 'global',
+    label: 'gex-node global – Node (npm) global packages report',
+  },
+  {
+    id: '3',
+    runtime: 'node',
+    command: 'read',
+    label: 'gex-node read   – Node (npm) read existing report',
+  },
+  {
+    id: '4',
+    runtime: 'bun',
+    command: 'local',
+    label: 'gex-bun local   – Bun local project report',
+  },
+  {
+    id: '5',
+    runtime: 'bun',
+    command: 'global',
+    label: 'gex-bun global  – Bun global packages report',
+  },
+  {
+    id: '6',
+    runtime: 'bun',
+    command: 'read',
+    label: 'gex-bun read    – Bun read existing report',
+  },
+]
+
+function getIO(io: RuntimeSelectionIO) {
+  return {
+    input: io.input ?? process.stdin,
+    output: io.output ?? process.stdout,
+  }
+}
+
+async function askQuestion(prompt: string, io: RuntimeSelectionIO = {}): Promise<string> {
+  const { input, output } = getIO(io)
+
+  return new Promise<string>((resolve) => {
     const rl = readline.createInterface({ input, output })
-
-    output.write('\nSelect a runtime to use:\n')
-    output.write('  1) gex-bun (Bun package manager)\n')
-    output.write('  2) gex-npm (npm / Node.js package manager)\n\n')
-
-    rl.question('Enter your choice (1-2): ', (answer) => {
+    rl.question(prompt, (answer) => {
       rl.close()
-
-      const choice = answer.trim().toLowerCase()
-
-      if (choice === '1' || choice === 'gex-bun' || choice === 'bun') {
-        resolve('bun')
-        return
-      }
-
-      if (
-        choice === '2' ||
-        choice === 'gex-npm' ||
-        choice === 'gex-node' ||
-        choice === 'npm' ||
-        choice === 'node'
-      ) {
-        resolve('npm')
-        return
-      }
-
-      resolve(null)
+      resolve(answer)
     })
   })
 }
 
+function parseArgLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inSingleQuote = false
+  let inDoubleQuote = false
+
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]
+
+    if (inSingleQuote) {
+      if (ch === "'") {
+        inSingleQuote = false
+      } else {
+        current += ch
+      }
+      continue
+    }
+
+    if (inDoubleQuote) {
+      if (ch === '"') {
+        inDoubleQuote = false
+      } else {
+        current += ch
+      }
+      continue
+    }
+
+    if (ch === "'") {
+      inSingleQuote = true
+      continue
+    }
+
+    if (ch === '"') {
+      inDoubleQuote = true
+      continue
+    }
+
+    if (ch === ' ' || ch === '\t') {
+      if (current) {
+        result.push(current)
+        current = ''
+      }
+      continue
+    }
+
+    current += ch
+  }
+
+  if (current) {
+    result.push(current)
+  }
+
+  return result
+}
+
+async function promptMenuSelection(io: RuntimeSelectionIO = {}): Promise<MenuItem | null> {
+  const { output } = getIO(io)
+
+  output.write('\nGEX interactive launcher\n')
+  output.write('Choose a runtime and command to run:\n\n')
+
+  for (const item of MENU_ITEMS) {
+    output.write(`  ${item.id}) ${item.label}\n`)
+  }
+
+  output.write('  q) Quit without running anything\n\n')
+
+  const answer = (await askQuestion('Enter your choice (1-6 or q): ', io)).trim().toLowerCase()
+
+  if (answer === 'q' || answer === 'quit' || answer === 'exit') {
+    output.write('\nExiting without running a command.\n')
+    return null
+  }
+
+  const selected = MENU_ITEMS.find((item) => item.id === answer)
+
+  if (!selected) {
+    output.write('Invalid selection. Please run `gex` again and choose a valid option.\n')
+    process.exitCode = 1
+    return null
+  }
+
+  return selected
+}
+
+async function runInteractive(io: RuntimeSelectionIO = {}): Promise<void> {
+  const selection = await promptMenuSelection(io)
+  if (!selection) return
+
+  const { output } = getIO(io)
+  const binaryName = selection.runtime === 'node' ? 'gex-node' : 'gex-bun'
+
+  output.write(`\nSelected: ${binaryName} ${selection.command}\n`)
+
+  const extraLine = await askQuestion(
+    `Enter extra flags/arguments for "${binaryName} ${selection.command}" (or press Enter for none): `,
+    io,
+  )
+
+  const extraArgs = parseArgLine(extraLine.trim())
+  const argv = [binaryName, selection.command, ...extraArgs]
+
+  const renderedArgs = extraArgs.join(' ')
+  const finalCommand =
+    renderedArgs.length > 0
+      ? `${binaryName} ${selection.command} ${renderedArgs}`
+      : `${binaryName} ${selection.command}`
+
+  output.write(`\nRunning:\n\n  ${finalCommand}\n\n`)
+
+  if (selection.runtime === 'node') {
+    await runNodeCli(argv)
+  } else {
+    await runBunCli(argv)
+  }
+}
+
 /**
- * Main CLI runner function
+ * Main CLI runner function.
+ *
+ * - When invoked without subcommands or flags, presents an interactive menu and
+ *   executes the chosen runtime/command via the appropriate CLI.
+ * - When invoked with additional arguments, forwards argv to the Node runtime
+ *   CLI for backward compatibility (behaving like `gex-node`).
  *
  * @param argv - Command line arguments (defaults to process.argv)
  * @param io - Optional streams used for interactive selection (mainly for tests)
  */
 export async function run(argv = process.argv, io: RuntimeSelectionIO = {}): Promise<void> {
-  // Keep argv parameter for backward compatibility with callers, but do not
-  // execute any runtime commands from this entrypoint.
-  void argv
+  const [, , ...rest] = argv
 
-  const choice = await promptRuntimeSelection(io)
-  const output = io.output ?? process.stdout
-
-  if (choice === 'bun') {
-    output.write(
-      '\nYou selected the Bun runtime.\nRun `gex-bun [command] [options]` to use the Bun CLI directly.\n',
-    )
+  if (rest.length > 0) {
+    await runNodeCli(argv)
     return
   }
 
-  if (choice === 'npm') {
-    output.write(
-      '\nYou selected the npm/Node.js runtime.\nRun `gex-npm [command] [options]` to use the Node CLI directly.\n',
-    )
-    return
-  }
-
-  output.write('Invalid selection. Please run `gex` again and choose 1 or 2.\n')
-  process.exitCode = 1
+  await runInteractive(io)
 }
 
 const isMainModule = (() => {

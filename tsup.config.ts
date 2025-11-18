@@ -32,7 +32,7 @@ export default defineConfig([
   },
   // Node.js runtime-specific CLI
   {
-    entry: { 'cli-node': 'src/runtimes/node/cli.ts' },
+    entry: { 'cli-node': 'src/runtimes/node/cli.entry.ts' },
     format: ['esm', 'cjs'],
     dts: false,
     sourcemap: true,
@@ -48,7 +48,7 @@ export default defineConfig([
   },
   // Bun CLI build (ESM only, Bun prefers ESM)
   {
-    entry: { 'cli-bun': 'src/runtimes/bun/cli.ts' },
+    entry: { 'cli-bun': 'src/runtimes/bun/cli.entry.ts' },
     format: ['esm'],
     dts: false,
     sourcemap: true,

@@ -12,9 +12,6 @@
 import readline from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
 
-import { run as runNodeCLI } from './runtimes/node/cli.js'
-import { run as runBunCLI } from './runtimes/bun/cli.js'
-
 type RuntimeChoice = 'bun' | 'npm' | null
 
 interface RuntimeSelectionIO {
@@ -66,20 +63,27 @@ async function promptRuntimeSelection(io: RuntimeSelectionIO = {}): Promise<Runt
  * @param io - Optional streams used for interactive selection (mainly for tests)
  */
 export async function run(argv = process.argv, io: RuntimeSelectionIO = {}): Promise<void> {
-  const effectiveArgv = argv ?? process.argv
+  // Keep argv parameter for backward compatibility with callers, but do not
+  // execute any runtime commands from this entrypoint.
+  void argv
+
   const choice = await promptRuntimeSelection(io)
+  const output = io.output ?? process.stdout
 
   if (choice === 'bun') {
-    await runBunCLI(effectiveArgv)
+    output.write(
+      '\nYou selected the Bun runtime.\nRun `gex-bun [command] [options]` to use the Bun CLI directly.\n',
+    )
     return
   }
 
   if (choice === 'npm') {
-    await runNodeCLI(effectiveArgv)
+    output.write(
+      '\nYou selected the npm/Node.js runtime.\nRun `gex-npm [command] [options]` to use the Node CLI directly.\n',
+    )
     return
   }
 
-  const output = io.output ?? process.stdout
   output.write('Invalid selection. Please run `gex` again and choose 1 or 2.\n')
   process.exitCode = 1
 }

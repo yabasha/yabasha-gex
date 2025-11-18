@@ -4,35 +4,21 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { run } from './cli.js'
 
-vi.mock('./runtimes/node/cli.js', () => ({
-  run: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('./runtimes/bun/cli.js', () => ({
-  run: vi.fn().mockResolvedValue(undefined),
-}))
-
-const mockNodeRun = vi.mocked((await import('./runtimes/node/cli.js')).run, true)
-const mockBunRun = vi.mocked((await import('./runtimes/bun/cli.js')).run, true)
-
 describe('Main CLI entry (gex)', () => {
-  let originalArgv: string[]
   let originalExitCode: number | undefined
 
   beforeEach(() => {
     vi.clearAllMocks()
-    originalArgv = process.argv
     originalExitCode = process.exitCode
     process.exitCode = 0
   })
 
   afterEach(() => {
-    process.argv = originalArgv
     process.exitCode = originalExitCode
   })
 
-  it('prompts and runs Bun runtime when user selects option 1 (preserving arguments)', async () => {
-    const argv = ['node', 'cli.js', 'local']
+  it('prompts and prints Bun runtime hint when user selects option 1', async () => {
+    const argv = ['node', 'cli.js']
     const input = new PassThrough()
     const output = new PassThrough()
     const chunks: string[] = []
@@ -49,13 +35,14 @@ describe('Main CLI entry (gex)', () => {
 
     await runPromise
 
-    expect(chunks.join('')).toContain('gex-bun')
-    expect(mockBunRun).toHaveBeenCalledWith(argv)
-    expect(mockNodeRun).not.toHaveBeenCalled()
+    const outputText = chunks.join('')
+    expect(outputText).toContain('Select a runtime to use:')
+    expect(outputText).toContain('gex-bun')
+    expect(outputText).toContain('You selected the Bun runtime.')
   })
 
-  it('prompts and runs Node runtime when user selects option 2 (preserving arguments)', async () => {
-    const argv = ['node', 'cli.js', 'local']
+  it('prompts and prints Node runtime hint when user selects option 2', async () => {
+    const argv = ['node', 'cli.js']
     const input = new PassThrough()
     const output = new PassThrough()
 
@@ -66,8 +53,11 @@ describe('Main CLI entry (gex)', () => {
 
     await runPromise
 
-    expect(mockNodeRun).toHaveBeenCalledWith(argv)
-    expect(mockBunRun).not.toHaveBeenCalled()
+    const outputText = output.read()?.toString('utf8') ?? ''
+    expect(outputText).toContain('Select a runtime to use:')
+    expect(outputText).toContain('gex-npm')
+    expect(outputText).toContain('You selected the npm/Node.js runtime.')
+    expect(process.exitCode).toBe(0)
   })
 
   it('sets a non-zero exit code on invalid selection', async () => {
@@ -88,9 +78,9 @@ describe('Main CLI entry (gex)', () => {
 
     await runPromise
 
-    expect(chunks.join('')).toContain('Invalid selection')
+    const outputText = chunks.join('')
+    expect(outputText).toContain('Select a runtime to use:')
+    expect(outputText).toContain('Invalid selection')
     expect(process.exitCode).toBe(1)
-    expect(mockNodeRun).not.toHaveBeenCalled()
-    expect(mockBunRun).not.toHaveBeenCalled()
   })
 })

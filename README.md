@@ -39,7 +39,7 @@ node dist/cli.cjs --help
 
 ### Top-level entry: `gex` (interactive selector)
 
-Starting with v1.3.5, the primary `gex` binary is an interactive launcher that lets you choose which runtime to use:
+Starting with v1.3.6, the primary `gex` binary is an interactive launcher that lets you choose which runtime to use:
 
 ```bash
 gex
@@ -53,11 +53,7 @@ Select a runtime to use:
   2) gex-npm (npm / Node.js package manager)
 ```
 
-Enter `1` for the Bun-based CLI (`gex-bun`) or `2` for the Node/npm-based CLI (`gex-npm`). Any additional arguments you pass after `gex` are forwarded to the selected runtime, e.g.:
-
-```bash
-gex local --check-outdated   # choose Bun or npm, then run `local` on that runtime
-```
+Enter `1` for the Bun-based CLI (`gex-bun`) or `2` for the Node/npm-based CLI (`gex-npm`). The top-level `gex` command only shows this menu and a short hint; it does **not** execute any audit itself. To actually run commands, invoke `gex-bun` or `gex-npm` directly (see below).
 
 ### Direct runtimes: `gex-npm` (Node) and `gex-bun` (Bun)
 

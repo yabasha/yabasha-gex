@@ -216,17 +216,30 @@ Example (truncated):
 
 CI/CD examples:
 
-- Using npx (no global install):
+- Using npx (Node.js):
 
 ```bash
 npx -y @yabasha/gex@latest -f json -o gex-report.json
 ```
 
-- GitHub Actions step snippet:
+- Using bunx (Bun):
+
+```bash
+bunx @yabasha/gex@latest -f json -o gex-report.json
+```
+
+- GitHub Actions step snippet (Node):
 
 ```yaml
 - name: Generate dependency report
   run: npx -y @yabasha/gex@latest -f json -o gex-report.json
+```
+
+- GitHub Actions step snippet (Bun):
+
+```yaml
+- name: Generate dependency report
+  run: bunx @yabasha/gex@latest -f json -o gex-report.json
 ```
 
 ## Development (repo)

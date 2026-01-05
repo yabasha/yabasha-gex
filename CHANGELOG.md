@@ -1,5 +1,11 @@
 # @yabasha/gex
 
+## 1.4.0
+
+### Minor Changes
+
+- [`6f69229`](https://github.com/yabasha/yabasha-gex/commit/6f69229c340f2d3c54d3ee8741510d3850d4f46a) Thanks [@github-actions[bot]](https://github.com/github-actions%5Bbot%5D)! - feat: add `gb` and `gn` CLI aliases
+
 ## 1.3.4
 
 ### Patch Changes

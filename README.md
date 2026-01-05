@@ -21,19 +21,37 @@ Reports can be emitted as machine-readable JSON (default) or human-friendly Mark
 ## Install
 
 - Requirements: Node >= 18.18, npm
-- Global install:
+- **Global install (npm)**:
 
-```bash
-npm i -g @yabasha/gex
-```
+  ```bash
+  npm i -g @yabasha/gex
+  ```
 
-Or run locally after building this repo:
+- **Global install (Bun)**:
 
-```bash
-npm i
-npm run build
-node dist/cli.cjs --help
-```
+  ```bash
+  bun add -g @yabasha/gex
+  ```
+
+- **Local Build / Development**:
+
+  clone the repository and run:
+
+  **Using npm**:
+
+  ```bash
+  npm i
+  npm run build
+  node dist/cli.cjs --help
+  ```
+
+  **Using Bun**:
+
+  ```bash
+  bun install
+  bun run build
+  bun dist/cli-bun.mjs --help
+  ```
 
 ## Usage
 

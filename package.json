@@ -17,7 +17,9 @@
   "bin": {
     "gex": "./dist/cli.cjs",
     "gex-node": "./dist/cli-node.cjs",
-    "gex-bun": "./dist/cli-bun.mjs"
+    "gex-bun": "./dist/cli-bun.mjs",
+    "gb": "./dist/cli-bun.mjs",
+    "gn": "./dist/cli-node.cjs"
   },
   "files": [
     "dist"

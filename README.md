@@ -11,7 +11,7 @@
 
 # GEX — Global/local dependency auditing and documentation for Node.js
 
-GEX is a focused CLI that generates structured, reproducible reports of your Node.js package environments:
+GEX is a focused CLI that generates structured, reproducible reports of your Node.js / bun package environments:
 
 - Local project dependencies (default)
 - Globally installed packages
@@ -20,7 +20,7 @@ Reports can be emitted as machine-readable JSON (default) or human-friendly Mark
 
 ## Install
 
-- Requirements: Node >= 18.18, npm
+- Requirements: Node >= 20, npm
 - **Global install (npm)**:
 
   ```bash

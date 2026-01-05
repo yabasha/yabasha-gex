@@ -85,7 +85,10 @@ You can also call each runtime directly without the interactive launcher:
 
 ```bash
 gex-node [command] [options]   # Node.js / npm runtime (formerly `gex`)
+# Alias: gn
+
 gex-bun [command] [options]    # Bun runtime
+# Alias: gb
 ```
 
 Common command options:

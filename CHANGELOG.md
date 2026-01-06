@@ -1,5 +1,11 @@
 # @yabasha/gex
 
+## 1.4.4
+
+### Patch Changes
+
+- Add status badges to README
+
 ## 1.4.0
 
 ### Minor Changes

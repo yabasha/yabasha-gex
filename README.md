@@ -11,6 +11,8 @@
 
 # GEX — Global/local dependency auditing and documentation for Node.js
 
+![npm version](https://img.shields.io/npm/v/@yabasha/gex.svg?style=for-the-badge) ![license](https://img.shields.io/github/license/yabasha/yabasha-gex?style=for-the-badge) ![Node.js >= 20](https://img.shields.io/badge/Node-%3E%3D20-brightgreen.svg?style=for-the-badge) ![Bun support](https://img.shields.io/badge/Bun-Supported-blue.svg?style=for-the-badge)
+
 GEX is a focused CLI that generates structured, reproducible reports of your Node.js / bun package environments:
 
 - Local project dependencies (default)

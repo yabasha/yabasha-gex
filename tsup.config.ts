@@ -62,4 +62,36 @@ export default defineConfig([
       return { js: '.mjs' }
     },
   },
+  // Yarn runtime CLI
+  {
+    entry: { 'cli-yarn': 'src/runtimes/yarn/cli.entry.ts' },
+    format: ['esm', 'cjs'],
+    dts: false,
+    sourcemap: true,
+    clean: false,
+    target: 'node18',
+    outDir: 'dist',
+    banner: {
+      js: '#!/usr/bin/env node',
+    },
+    outExtension({ format }) {
+      return { js: format === 'cjs' ? '.cjs' : '.mjs' }
+    },
+  },
+  // pnpm runtime CLI
+  {
+    entry: { 'cli-pnpm': 'src/runtimes/pnpm/cli.entry.ts' },
+    format: ['esm', 'cjs'],
+    dts: false,
+    sourcemap: true,
+    clean: false,
+    target: 'node18',
+    outDir: 'dist',
+    banner: {
+      js: '#!/usr/bin/env node',
+    },
+    outExtension({ format }) {
+      return { js: format === 'cjs' ? '.cjs' : '.mjs' }
+    },
+  },
 ])

@@ -7,7 +7,13 @@ import { readFile } from 'node:fs/promises'
 
 import { Command } from 'commander'
 
-import type { OutputFormat } from '../../shared/types.js'
+import type { AuditSeverity, OutputFormat } from '../../shared/types.js'
+import {
+  formatAuditSummary,
+  formatAuditTable,
+  handleAuditWorkflow,
+  isSeverityFlag,
+} from '../../shared/cli/audit.js'
 import { installFromReport, printFromReport } from '../../shared/cli/install.js'
 import { outputReport } from '../../shared/cli/output.js'
 import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
@@ -19,6 +25,7 @@ import {
 } from '../../shared/cli/outdated.js'
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
+import { bunAudit } from './audit.js'
 import { produceReport } from './report.js'
 import { bunUpdate, bunPmLs } from './package-manager.js'
 
@@ -44,12 +51,25 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
       '-u, --update-outdated [packages...]',
       'Update outdated packages (omit package names to update every package)',
     )
+    .option('--audit', 'Run bun audit and include vulnerabilities in the report', false)
+    .option(
+      '--fail-on <severity>',
+      'With --audit, exit non-zero if a vulnerability of this severity or higher is found (info|low|moderate|high|critical)',
+    )
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
   }
 
   return cmd
+}
+
+function resolveFailOn(value: unknown): AuditSeverity | undefined {
+  if (value === undefined || value === null) return undefined
+  if (isSeverityFlag(value)) return value
+  throw new Error(
+    `Invalid --fail-on value: ${String(value)}. Expected one of: info, low, moderate, high, critical.`,
+  )
 }
 
 /**
@@ -70,6 +90,8 @@ export function createLocalCommand(program: Command): Command {
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
     const omitDev = Boolean(opts.omitDev)
+    const auditEnabled = Boolean(opts.audit)
+    const failOn = resolveFailOn(opts.failOn)
     const cwd = process.cwd()
 
     const selection = normalizeUpdateSelection(opts.updateOutdated)
@@ -129,7 +151,28 @@ export function createLocalCommand(program: Command): Command {
       omitDev,
     })
 
+    const auditOutcome = await handleAuditWorkflow({
+      enabled: auditEnabled,
+      failOn,
+      showSpinner: true,
+      runAudit: () => bunAudit({ cwd }),
+    })
+    if (auditOutcome.audit) {
+      report.audit = auditOutcome.audit
+      if (!finalOutFile) {
+        console.log(formatAuditSummary(auditOutcome.audit.summary))
+        if (auditOutcome.audit.vulnerabilities.length > 0) {
+          console.log(formatAuditTable(auditOutcome.audit.vulnerabilities))
+        }
+      }
+    }
+
     await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+
+    if (auditOutcome.shouldFail) {
+      console.error(`Audit found vulnerabilities at or above the --fail-on=${failOn} threshold.`)
+      process.exitCode = 1
+    }
   })
 
   return localCmd

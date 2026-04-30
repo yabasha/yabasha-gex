@@ -2,6 +2,10 @@
  * @fileoverview TypeScript type definitions for GEX dependency reporting
  */
 
+export type { AuditAdvisory, AuditResult, AuditSeverity, AuditSummary } from './npm-cli.js'
+
+import type { AuditResult } from './npm-cli.js'
+
 /**
  * Information about a single package/dependency
  */
@@ -36,6 +40,8 @@ export type Report = {
   local_dev_dependencies: PackageInfo[]
   /** Optional raw npm ls tree data */
   tree?: unknown
+  /** Optional vulnerability audit results (when --audit) */
+  audit?: AuditResult
 }
 
 /**

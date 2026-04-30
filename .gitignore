@@ -10,6 +10,7 @@ coverage
 gex-report.json
 .DS_Store
 global.md
+FEATURES.md
 !WARP.md
 !CLAUDE.md
 !AGENTS.md

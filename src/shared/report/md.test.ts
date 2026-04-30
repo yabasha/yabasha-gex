@@ -198,6 +198,41 @@ describe('renderMarkdown', () => {
     }
   })
 
+  it('should render an audit section when audit data is present', () => {
+    const reportWithAudit: Report = {
+      ...mockReport,
+      audit: {
+        summary: { info: 0, low: 0, moderate: 0, high: 1, critical: 1, total: 2 },
+        vulnerabilities: [
+          {
+            name: 'minimist',
+            severity: 'critical',
+            range: '<0.2.1',
+            fix_available: true,
+            title: 'Prototype Pollution',
+            url: 'https://example.com/advisory',
+          },
+          {
+            name: 'axios',
+            severity: 'high',
+            range: '<1.6.5',
+            fix_available: false,
+          },
+        ],
+      },
+    }
+
+    const result = renderMarkdown(reportWithAudit)
+    expect(result).toContain('## Vulnerability Audit')
+    expect(result).toContain('2 vulnerabilities')
+    expect(result).toContain('| minimist | critical |')
+    expect(result).toContain('| axios | high |')
+  })
+
+  it('should not render an audit section when audit is absent', () => {
+    expect(renderMarkdown(mockReport)).not.toContain('## Vulnerability Audit')
+  })
+
   it('should handle partial project metadata', () => {
     const reportWithPartialMeta = {
       ...mockReport,

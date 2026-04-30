@@ -178,4 +178,26 @@ describe('renderJson', () => {
 
     expect(result1).toBe(result2)
   })
+
+  it('should include audit data when present', () => {
+    const reportWithAudit: Report = {
+      ...mockReport,
+      audit: {
+        summary: { info: 0, low: 0, moderate: 0, high: 1, critical: 0, total: 1 },
+        vulnerabilities: [
+          {
+            name: 'axios',
+            severity: 'high',
+            range: '<1.6.5',
+            fix_available: true,
+            title: 'SSRF',
+            url: 'https://example.com',
+          },
+        ],
+      },
+    }
+
+    const parsed = JSON.parse(renderJson(reportWithAudit)) as Report
+    expect(parsed.audit).toEqual(reportWithAudit.audit)
+  })
 })

@@ -2,6 +2,7 @@
  * @fileoverview Markdown report rendering utilities
  */
 
+import { formatAuditSummary } from '../cli/audit.js'
 import type { Report } from '../types.js'
 
 /**
@@ -101,6 +102,23 @@ export function renderMarkdown(
     ])
     lines.push(table(['Name', 'Version', 'Path'], rows))
     lines.push('')
+  }
+
+  if (report.audit) {
+    lines.push('## Vulnerability Audit')
+    lines.push(formatAuditSummary(report.audit.summary))
+    lines.push('')
+    if (report.audit.vulnerabilities.length > 0) {
+      const rows = report.audit.vulnerabilities.map((v) => [
+        v.name,
+        v.severity,
+        v.range || '',
+        v.fix_available ? 'yes' : 'no',
+        v.title || '',
+      ])
+      lines.push(table(['Name', 'Severity', 'Range', 'Fix', 'Title'], rows))
+      lines.push('')
+    }
   }
 
   lines.push('---')

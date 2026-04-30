@@ -56,6 +56,11 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
+    cmd.option(
+      '--from-lockfile',
+      'Build the report from package-lock.json instead of running npm ls',
+      false,
+    )
   }
 
   return cmd
@@ -79,6 +84,7 @@ export function createLocalCommand(program: Command): Command {
     const outFile = opts.outFile as string | undefined
     const fullTree = Boolean(opts.fullTree)
     const omitDev = Boolean(opts.omitDev)
+    const fromLockfile = Boolean(opts.fromLockfile)
     const cwd = process.cwd()
 
     const selection = normalizeUpdateSelection(opts.updateOutdated)
@@ -108,6 +114,7 @@ export function createLocalCommand(program: Command): Command {
       outFile: finalOutFile,
       fullTree,
       omitDev,
+      fromLockfile,
     })
 
     const deprecatedResult = await applyDeprecatedCheck(report, {

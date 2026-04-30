@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { buildReportFromNpmTree } from '../../shared/transform.js'
+import { parsePackageLockJson } from '../../shared/lockfile.js'
 import type { OutputFormat, Report } from '../../shared/types.js'
 import { getToolVersion } from '../../shared/cli/utils.js'
 
@@ -20,6 +21,7 @@ export interface ReportOptions {
   fullTree?: boolean
   omitDev?: boolean
   cwd?: string
+  fromLockfile?: boolean
 }
 
 /**
@@ -49,12 +51,31 @@ export async function produceReport(
   const depth0 = !options.fullTree
   const cwd = options.cwd || process.cwd()
 
-  const tree = await npmLs({
-    global: ctx === 'global',
-    omitDev: ctx === 'local' ? Boolean(options.omitDev) : false,
-    depth0,
-    cwd,
-  })
+  let tree: any
+  if (options.fromLockfile) {
+    if (ctx === 'global') {
+      throw new Error(
+        '--from-lockfile is not supported for global packages (no lockfile available)',
+      )
+    }
+    const lockPath = path.join(cwd, 'package-lock.json')
+    let raw: string
+    try {
+      raw = await readFile(lockPath, 'utf8')
+    } catch {
+      throw new Error(
+        `No lockfile found at ${lockPath} (--from-lockfile requires package-lock.json)`,
+      )
+    }
+    tree = parsePackageLockJson(raw, { cwd })
+  } else {
+    tree = await npmLs({
+      global: ctx === 'global',
+      omitDev: ctx === 'local' ? Boolean(options.omitDev) : false,
+      depth0,
+      cwd,
+    })
+  }
 
   let project_description: string | undefined
   let project_homepage: string | undefined

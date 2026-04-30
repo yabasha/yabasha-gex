@@ -32,14 +32,20 @@ function deprecationCell(pkg: PackageInfo): string {
 
 function packageRows(
   packages: PackageInfo[],
+  showLicense: boolean,
   showDeprecated: boolean,
 ): { headers: string[]; rows: string[][] } {
-  const headers = showDeprecated
-    ? ['Name', 'Version', 'Path', 'Deprecated']
-    : ['Name', 'Version', 'Path']
+  const headers = ['Name', 'Version']
+  if (showLicense) headers.push('License')
+  headers.push('Path')
+  if (showDeprecated) headers.push('Deprecated')
+
   const rows = packages.map((p) => {
-    const base = [p.name, p.version || '', p.resolved_path || '']
-    return showDeprecated ? [...base, deprecationCell(p)] : base
+    const row = [p.name, p.version || '']
+    if (showLicense) row.push(p.license || '')
+    row.push(p.resolved_path || '')
+    if (showDeprecated) row.push(deprecationCell(p))
+    return row
   })
   return { headers, rows }
 }
@@ -153,10 +159,16 @@ export function renderMarkdown(
     lines.push('')
   }
 
+  const includeLicense =
+    report.global_packages.some((p) => p.license !== undefined) ||
+    report.local_dependencies.some((p) => p.license !== undefined) ||
+    report.local_dev_dependencies.some((p) => p.license !== undefined)
+
   if (report.global_packages.length > 0) {
     lines.push('## Global Packages')
     const { headers, rows } = packageRows(
       report.global_packages,
+      includeLicense,
       hasAnyDeprecation(report.global_packages),
     )
     lines.push(table(headers, rows))
@@ -167,6 +179,7 @@ export function renderMarkdown(
     lines.push('## Local Dependencies')
     const { headers, rows } = packageRows(
       report.local_dependencies,
+      includeLicense,
       hasAnyDeprecation(report.local_dependencies),
     )
     lines.push(table(headers, rows))
@@ -177,6 +190,7 @@ export function renderMarkdown(
     lines.push('## Local Dev Dependencies')
     const { headers, rows } = packageRows(
       report.local_dev_dependencies,
+      includeLicense,
       hasAnyDeprecation(report.local_dev_dependencies),
     )
     lines.push(table(headers, rows))

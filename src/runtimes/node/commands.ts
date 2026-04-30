@@ -8,6 +8,11 @@ import { Command } from 'commander'
 
 import type { OutputFormat } from '../../shared/types.js'
 import { createDiffCommand } from '../../shared/cli/diff-command.js'
+import {
+  formatLicenseViolations,
+  handleLicenseWorkflow,
+  parseAllowlist,
+} from '../../shared/cli/license-workflow.js'
 import { installFromReport, printFromReport } from '../../shared/cli/install.js'
 import { outputReport } from '../../shared/cli/output.js'
 import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
@@ -53,6 +58,11 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
       'Update outdated packages (omit package names to update every package)',
     )
     .option('--check-deprecated', 'Flag packages marked deprecated in the npm registry', false)
+    .option('--with-license', 'Include each package’s SPDX license in the report', false)
+    .option(
+      '--license-allowlist <list>',
+      'Comma-separated SPDX licenses to allow; non-empty list implies --with-license and exits non-zero on any violation',
+    )
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
@@ -124,7 +134,19 @@ export function createLocalCommand(program: Command): Command {
     })
     if (!deprecatedResult.proceed) return
 
-    await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+    const allowlist = parseAllowlist(opts.licenseAllowlist)
+    const licenseOutcome = await handleLicenseWorkflow(report, {
+      enabled: Boolean(opts.withLicense),
+      allowlist,
+    })
+
+    await outputReport(licenseOutcome.report, outputFormat, finalOutFile, markdownExtras)
+
+    if (licenseOutcome.violations.length > 0) {
+      console.error(`License allowlist violations (${licenseOutcome.violations.length}):`)
+      console.error(formatLicenseViolations(licenseOutcome.violations))
+    }
+    if (licenseOutcome.shouldFail) process.exitCode = 1
   })
 
   return localCmd
@@ -184,7 +206,19 @@ export function createGlobalCommand(program: Command): Command {
     })
     if (!deprecatedResult.proceed) return
 
-    await outputReport(report, outputFormat, finalOutFile, markdownExtras)
+    const allowlist = parseAllowlist(opts.licenseAllowlist)
+    const licenseOutcome = await handleLicenseWorkflow(report, {
+      enabled: Boolean(opts.withLicense),
+      allowlist,
+    })
+
+    await outputReport(licenseOutcome.report, outputFormat, finalOutFile, markdownExtras)
+
+    if (licenseOutcome.violations.length > 0) {
+      console.error(`License allowlist violations (${licenseOutcome.violations.length}):`)
+      console.error(formatLicenseViolations(licenseOutcome.violations))
+    }
+    if (licenseOutcome.shouldFail) process.exitCode = 1
   })
 
   return globalCmd

@@ -236,6 +236,32 @@ describe('renderMarkdown', () => {
     expect(result).not.toContain('Deprecated')
   })
 
+  it('should include a License column when any package has a license field', () => {
+    const reportWithLicenses: Report = {
+      ...mockReport,
+      local_dependencies: [
+        {
+          name: 'commander',
+          version: '12.1.0',
+          resolved_path: '/path/to/project/node_modules/commander',
+          license: 'MIT',
+        },
+      ],
+    }
+
+    const result = renderMarkdown(reportWithLicenses)
+    expect(result).toContain('| Name | Version | License | Path |')
+    expect(result).toContain(
+      '| commander | 12.1.0 | MIT | /path/to/project/node_modules/commander |',
+    )
+  })
+
+  it('should omit the License column when no package has a license field', () => {
+    const result = renderMarkdown(mockReport)
+    expect(result).toContain('| Name | Version | Path |')
+    expect(result).not.toContain('| Name | Version | License | Path |')
+  })
+
   it('should handle partial project metadata', () => {
     const reportWithPartialMeta = {
       ...mockReport,

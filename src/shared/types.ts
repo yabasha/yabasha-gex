@@ -14,6 +14,8 @@ export type PackageInfo = {
   resolved_path: string
   /** Deprecation message from the registry, or null if not deprecated. Only set when --check-deprecated is used. */
   deprecated?: string | null
+  /** SPDX license identifier (populated when --with-license is used) */
+  license?: string
 }
 
 /**

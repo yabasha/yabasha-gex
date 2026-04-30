@@ -2,7 +2,7 @@
  * @fileoverview Markdown report rendering utilities
  */
 
-import type { Report } from '../types.js'
+import type { PackageInfo, Report } from '../types.js'
 
 /**
  * Creates a markdown table from headers and row data
@@ -16,6 +16,31 @@ function table(headers: string[], rows: string[][]): string {
   const sep = `| ${headers.map(() => '---').join(' | ')} |`
   const body = rows.map((r) => `| ${r.join(' | ')} |`).join('\n')
   return [header, sep, body].filter(Boolean).join('\n')
+}
+
+function hasAnyDeprecation(packages: PackageInfo[]): boolean {
+  return packages.some((p) => typeof p.deprecated === 'string' && p.deprecated.length > 0)
+}
+
+function deprecationCell(pkg: PackageInfo): string {
+  if (typeof pkg.deprecated === 'string' && pkg.deprecated.length > 0) {
+    return `⚠ ${pkg.deprecated}`
+  }
+  return ''
+}
+
+function packageRows(
+  packages: PackageInfo[],
+  showDeprecated: boolean,
+): { headers: string[]; rows: string[][] } {
+  const headers = showDeprecated
+    ? ['Name', 'Version', 'Path', 'Deprecated']
+    : ['Name', 'Version', 'Path']
+  const rows = packages.map((p) => {
+    const base = [p.name, p.version || '', p.resolved_path || '']
+    return showDeprecated ? [...base, deprecationCell(p)] : base
+  })
+  return { headers, rows }
 }
 
 /**
@@ -76,30 +101,31 @@ export function renderMarkdown(
 
   if (report.global_packages.length > 0) {
     lines.push('## Global Packages')
-    const rows = report.global_packages.map((p) => [p.name, p.version || '', p.resolved_path || ''])
-    lines.push(table(['Name', 'Version', 'Path'], rows))
+    const { headers, rows } = packageRows(
+      report.global_packages,
+      hasAnyDeprecation(report.global_packages),
+    )
+    lines.push(table(headers, rows))
     lines.push('')
   }
 
   if (report.local_dependencies.length > 0) {
     lines.push('## Local Dependencies')
-    const rows = report.local_dependencies.map((p) => [
-      p.name,
-      p.version || '',
-      p.resolved_path || '',
-    ])
-    lines.push(table(['Name', 'Version', 'Path'], rows))
+    const { headers, rows } = packageRows(
+      report.local_dependencies,
+      hasAnyDeprecation(report.local_dependencies),
+    )
+    lines.push(table(headers, rows))
     lines.push('')
   }
 
   if (report.local_dev_dependencies.length > 0) {
     lines.push('## Local Dev Dependencies')
-    const rows = report.local_dev_dependencies.map((p) => [
-      p.name,
-      p.version || '',
-      p.resolved_path || '',
-    ])
-    lines.push(table(['Name', 'Version', 'Path'], rows))
+    const { headers, rows } = packageRows(
+      report.local_dev_dependencies,
+      hasAnyDeprecation(report.local_dev_dependencies),
+    )
+    lines.push(table(headers, rows))
     lines.push('')
   }
 

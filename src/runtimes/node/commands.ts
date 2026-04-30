@@ -15,6 +15,7 @@ import {
   handleOutdatedWorkflow,
   formatOutdatedTable,
 } from '../../shared/cli/outdated.js'
+import { applyDeprecatedCheck } from '../../shared/cli/deprecated.js'
 import { npmOutdated, npmUpdate } from '../../shared/npm-cli.js'
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
@@ -42,6 +43,7 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
       '-u, --update-outdated [packages...]',
       'Update outdated packages (omit package names to update every package)',
     )
+    .option('--check-deprecated', 'Flag packages marked deprecated in the npm registry', false)
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
@@ -99,6 +101,13 @@ export function createLocalCommand(program: Command): Command {
       omitDev,
     })
 
+    const deprecatedResult = await applyDeprecatedCheck(report, {
+      checkDeprecated: Boolean(opts.checkDeprecated),
+      context: 'local',
+      outFile: finalOutFile,
+    })
+    if (!deprecatedResult.proceed) return
+
     await outputReport(report, outputFormat, finalOutFile, markdownExtras)
   })
 
@@ -151,6 +160,13 @@ export function createGlobalCommand(program: Command): Command {
       outFile: finalOutFile,
       fullTree,
     })
+
+    const deprecatedResult = await applyDeprecatedCheck(report, {
+      checkDeprecated: Boolean(opts.checkDeprecated),
+      context: 'global',
+      outFile: finalOutFile,
+    })
+    if (!deprecatedResult.proceed) return
 
     await outputReport(report, outputFormat, finalOutFile, markdownExtras)
   })

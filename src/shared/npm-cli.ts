@@ -19,11 +19,13 @@ export type NpmUpdateOptions = {
   packages?: string[]
 }
 
-async function getExecFileAsync(): Promise<(
-  command: string,
-  args?: readonly string[] | null,
-  options?: any,
-) => Promise<{ stdout: string; stderr: string }>> {
+async function getExecFileAsync(): Promise<
+  (
+    command: string,
+    args?: readonly string[] | null,
+    options?: any,
+  ) => Promise<{ stdout: string; stderr: string }>
+> {
   const { execFile } = await import('node:child_process')
   return promisify(execFile) as any
 }
@@ -87,6 +89,29 @@ function formatNpmError(error: any, commandLabel: string): Error {
   const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : ''
   const message = stderr || error?.message || `${commandLabel} failed`
   return new Error(`${commandLabel} failed: ${message}`)
+}
+
+export async function npmViewDeprecated(packageName: string): Promise<string | null> {
+  let stdout: string
+  try {
+    const execFileAsync = await getExecFileAsync()
+    const result = await execFileAsync('npm', ['view', packageName, 'deprecated', '--json'], {
+      maxBuffer: 5 * 1024 * 1024,
+    })
+    stdout = result.stdout
+  } catch {
+    return null
+  }
+
+  if (!stdout || !stdout.trim()) return null
+
+  try {
+    const parsed = JSON.parse(stdout)
+    if (typeof parsed === 'string' && parsed.trim().length > 0) return parsed
+    return null
+  } catch {
+    return null
+  }
 }
 
 export async function npmViewVersion(packageName: string): Promise<string> {

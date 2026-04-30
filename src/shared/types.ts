@@ -12,6 +12,8 @@ export type PackageInfo = {
   version: string
   /** Resolved file system path to the package */
   resolved_path: string
+  /** Deprecation message from the registry, or null if not deprecated. Only set when --check-deprecated is used. */
+  deprecated?: string | null
 }
 
 /**

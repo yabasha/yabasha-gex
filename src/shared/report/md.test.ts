@@ -198,6 +198,44 @@ describe('renderMarkdown', () => {
     }
   })
 
+  it('renders a Deprecated column when any package has a deprecated field set', () => {
+    const reportWithDeprecation: Report = {
+      report_version: '1.0',
+      timestamp: '2025-01-13T12:00:00.000Z',
+      tool_version: '0.3.2',
+      global_packages: [],
+      local_dependencies: [
+        {
+          name: 'request',
+          version: '2.88.2',
+          resolved_path: '/path/to/request',
+          deprecated: 'request has been deprecated, see https://...',
+        },
+        {
+          name: 'lodash',
+          version: '4.17.21',
+          resolved_path: '/path/to/lodash',
+          deprecated: null,
+        },
+      ],
+      local_dev_dependencies: [],
+    }
+
+    const result = renderMarkdown(reportWithDeprecation)
+
+    expect(result).toContain('Deprecated')
+    expect(result).toContain('⚠ request has been deprecated, see https://...')
+    expect(result).toContain(
+      '| request | 2.88.2 | /path/to/request | ⚠ request has been deprecated',
+    )
+    expect(result).toMatch(/\| lodash \| 4\.17\.21 \| \/path\/to\/lodash \|\s+\|/)
+  })
+
+  it('omits the Deprecated column when no package has the field set', () => {
+    const result = renderMarkdown(mockReport)
+    expect(result).not.toContain('Deprecated')
+  })
+
   it('should handle partial project metadata', () => {
     const reportWithPartialMeta = {
       ...mockReport,

@@ -18,10 +18,18 @@ import {
   formatOutdatedTable,
 } from '../../shared/cli/outdated.js'
 import { applyDeprecatedCheck } from '../../shared/cli/deprecated.js'
+import {
+  attachAuditToReport,
+  formatAuditTable,
+  normalizeBunAudit,
+  parseFailOn,
+  runAuditWorkflow,
+  type AuditNormalizer,
+} from '../../shared/cli/audit.js'
 import { ASCII_BANNER, getToolVersion } from '../../shared/cli/utils.js'
 
 import { produceReport } from './report.js'
-import { bunUpdate, bunPmLs } from './package-manager.js'
+import { bunAudit, bunPmLs, bunUpdate } from './package-manager.js'
 
 /**
  * Adds common options to a command
@@ -260,6 +268,124 @@ export function createReadCommand(program: Command): Command {
 }
 
 /**
+ * Creates the audit command handler for the Bun runtime
+ *
+ * @param program - Commander program instance
+ * @returns Command instance
+ */
+export function createAuditCommand(program: Command): Command {
+  const auditCmd = program
+    .command('audit')
+    .description('Run a vulnerability audit and embed it in the report')
+
+  addCommonOptions(auditCmd, { allowOmitDev: true })
+  auditCmd.option(
+    '--fail-on <severity>',
+    'Exit non-zero when severity at or above threshold is present (low|moderate|high|critical)',
+  )
+
+  auditCmd.action(async (opts) => {
+    const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
+    const outFile = opts.outFile as string | undefined
+    const fullTree = Boolean(opts.fullTree)
+    const omitDev = Boolean(opts.omitDev)
+    const cwd = process.cwd()
+
+    let failOn
+    try {
+      failOn = parseFailOn(opts.failOn)
+    } catch (err: any) {
+      console.error(err?.message || 'Invalid --fail-on value')
+      process.exitCode = 2
+      return
+    }
+
+    const selection = normalizeUpdateSelection(opts.updateOutdated)
+    // outdatedResult.proceed is intentionally not honored: gex-bun audit always continues
+    // to produce the report, regardless of --check-outdated output.
+    const outdatedResult = await handleOutdatedWorkflow({
+      checkOutdated: Boolean(opts.checkOutdated),
+      selection,
+      contextLabel: 'local',
+      outFile,
+      fetchOutdated: async () => {
+        const tree = await bunPmLs({ cwd, omitDev })
+        const manifest = await readPackageManifest(cwd)
+        const declared = {
+          ...(manifest?.dependencies || {}),
+          ...(manifest?.optionalDependencies || {}),
+          ...(manifest?.devDependencies || {}),
+        }
+        const packages = Object.entries(tree.dependencies).map(([name, node]) => ({
+          name,
+          current: node.version,
+          declared: declared[name],
+          type: 'prod',
+        }))
+        if (tree.devDependencies) {
+          for (const [name, node] of Object.entries(tree.devDependencies)) {
+            packages.push({
+              name,
+              current: node.version,
+              declared: declared[name],
+              type: 'dev',
+            })
+          }
+        }
+        return resolveOutdatedWithNpmView(packages)
+      },
+      updateRunner: selection.shouldUpdate
+        ? async (packages) => {
+            await bunUpdate({ cwd, packages })
+          }
+        : undefined,
+    })
+    if (opts.checkOutdated) {
+      if (outdatedResult.outdated.length === 0) {
+        console.log('All local packages are up to date.')
+      } else {
+        console.log(formatOutdatedTable(outdatedResult.outdated))
+      }
+    }
+
+    const { report, markdownExtras } = await produceReport('local', {
+      outputFormat,
+      outFile,
+      fullTree,
+      omitDev,
+    })
+
+    // applyDeprecatedCheck's `proceed` return value is intentionally ignored: the
+    // deprecated table is advisory output, but gex-bun audit always emits the report.
+    await applyDeprecatedCheck(report, {
+      checkDeprecated: Boolean(opts.checkDeprecated),
+      context: 'local',
+      outFile,
+    })
+
+    const auditResult = await runAuditWorkflow({
+      runAudit: () => bunAudit({ cwd, omitDev }),
+      normalize: normalizeBunAudit as AuditNormalizer,
+      failOn,
+      outFile,
+    })
+    attachAuditToReport(report, auditResult)
+
+    if (!outFile) {
+      console.log(formatAuditTable(auditResult.vulns, auditResult.summary))
+    }
+
+    await outputReport(report, outputFormat, outFile, markdownExtras)
+
+    if (auditResult.shouldFail) {
+      process.exitCode = 1
+    }
+  })
+
+  return auditCmd
+}
+
+/**
  * Creates and configures the main CLI program for Bun runtime
  *
  * @returns Configured Commander program
@@ -274,6 +400,7 @@ export async function createProgram(): Promise<Command> {
 
   createLocalCommand(program)
   createGlobalCommand(program)
+  createAuditCommand(program)
   createReadCommand(program)
 
   return program

@@ -1,0 +1,172 @@
+import { describe, expect, it } from 'vitest'
+
+import type { NpmAuditRaw } from '../npm-cli.js'
+import type { BunAuditRaw } from '../../runtimes/bun/package-manager.js'
+
+import { normalizeNpmAudit, normalizeBunAudit, severityAtOrAbove } from './audit.js'
+
+describe('severityAtOrAbove', () => {
+  const counts = { info: 1, low: 2, moderate: 3, high: 4, critical: 5 }
+
+  it('counts entries at or above threshold', () => {
+    expect(severityAtOrAbove(counts, 'critical')).toBe(5)
+    expect(severityAtOrAbove(counts, 'high')).toBe(9)
+    expect(severityAtOrAbove(counts, 'moderate')).toBe(12)
+    expect(severityAtOrAbove(counts, 'low')).toBe(14)
+  })
+})
+
+describe('normalizeNpmAudit', () => {
+  it('emits one Vulnerability per advisory in the via list', () => {
+    const raw: NpmAuditRaw = {
+      auditReportVersion: 2,
+      vulnerabilities: {
+        lodash: {
+          name: 'lodash',
+          severity: 'high',
+          via: [
+            {
+              source: 1065,
+              name: 'lodash',
+              dependency: 'lodash',
+              title: 'Prototype Pollution',
+              url: 'https://github.com/advisories/GHSA-xxxx',
+              severity: 'high',
+              range: '<4.17.21',
+            },
+          ],
+        },
+      },
+      metadata: {
+        vulnerabilities: { info: 0, low: 0, moderate: 0, high: 1, critical: 0, total: 1 },
+        dependencies: { prod: 10, dev: 5, optional: 0, peer: 0, peerOptional: 0, total: 15 },
+      },
+    }
+
+    const { summary, vulns } = normalizeNpmAudit(raw)
+    expect(vulns).toEqual([
+      {
+        id: '1065',
+        package: 'lodash',
+        severity: 'high',
+        range: '<4.17.21',
+        title: 'Prototype Pollution',
+        url: 'https://github.com/advisories/GHSA-xxxx',
+      },
+    ])
+    expect(summary.counts).toEqual({ info: 0, low: 0, moderate: 0, high: 1, critical: 0 })
+    expect(summary.total).toBe(1)
+    expect(summary.dependencies).toEqual({
+      prod: 10,
+      dev: 5,
+      optional: 0,
+      peer: 0,
+      peerOptional: 0,
+      total: 15,
+    })
+  })
+
+  it('skips string entries in via (transitive parent refs)', () => {
+    const raw: NpmAuditRaw = {
+      vulnerabilities: {
+        downstream: {
+          name: 'downstream',
+          severity: 'low',
+          via: ['some-parent-package'],
+        },
+      },
+    }
+    const { vulns, summary } = normalizeNpmAudit(raw)
+    expect(vulns).toEqual([])
+    expect(summary.total).toBe(0)
+  })
+
+  it('coerces unknown severities to info', () => {
+    const raw: NpmAuditRaw = {
+      vulnerabilities: {
+        weird: {
+          name: 'weird',
+          severity: 'extreme',
+          via: [{ source: 9, title: 't', url: '', severity: 'extreme', range: '*' }],
+        },
+      },
+    }
+    const { vulns } = normalizeNpmAudit(raw)
+    expect(vulns[0].severity).toBe('info')
+  })
+
+  it('deduplicates the same advisory id within one package', () => {
+    const raw: NpmAuditRaw = {
+      vulnerabilities: {
+        lodash: {
+          name: 'lodash',
+          severity: 'high',
+          via: [
+            { source: 1065, name: 'lodash', title: 't', url: 'u', severity: 'high', range: '<1' },
+            { source: 1065, name: 'lodash', title: 't', url: 'u', severity: 'high', range: '<1' },
+          ],
+        },
+      },
+    }
+    const { vulns } = normalizeNpmAudit(raw)
+    expect(vulns).toHaveLength(1)
+  })
+
+  it('handles empty input', () => {
+    const { summary, vulns } = normalizeNpmAudit({})
+    expect(vulns).toEqual([])
+    expect(summary.counts).toEqual({ info: 0, low: 0, moderate: 0, high: 0, critical: 0 })
+    expect(summary.total).toBe(0)
+    expect(summary.dependencies).toBeUndefined()
+  })
+})
+
+describe('normalizeBunAudit', () => {
+  it('emits one Vulnerability per advisory entry', () => {
+    const raw: BunAuditRaw = {
+      lodash: [
+        {
+          id: 1065,
+          github_advisory_id: 'GHSA-xxxx-xxxx-xxxx',
+          severity: 'high',
+          title: 'Prototype Pollution',
+          url: 'https://github.com/advisories/GHSA-xxxx-xxxx-xxxx',
+          vulnerable_versions: '<4.17.21',
+          module_name: 'lodash',
+          cves: ['CVE-2020-8203'],
+        },
+      ],
+    }
+
+    const { summary, vulns } = normalizeBunAudit(raw)
+    expect(vulns).toEqual([
+      {
+        id: 'GHSA-xxxx-xxxx-xxxx',
+        package: 'lodash',
+        severity: 'high',
+        range: '<4.17.21',
+        title: 'Prototype Pollution',
+        url: 'https://github.com/advisories/GHSA-xxxx-xxxx-xxxx',
+        ghsa: 'GHSA-xxxx-xxxx-xxxx',
+        cve: 'CVE-2020-8203',
+      },
+    ])
+    expect(summary.counts.high).toBe(1)
+    expect(summary.total).toBe(1)
+    expect(summary.dependencies).toBeUndefined()
+  })
+
+  it('falls back to numeric id when no GHSA id is present', () => {
+    const raw: BunAuditRaw = {
+      pkg: [{ id: 42, severity: 'low', title: 't', url: 'u', vulnerable_versions: '<1' }],
+    }
+    const { vulns } = normalizeBunAudit(raw)
+    expect(vulns[0].id).toBe('42')
+  })
+
+  it('handles empty input', () => {
+    const { summary, vulns } = normalizeBunAudit({})
+    expect(vulns).toEqual([])
+    expect(summary.total).toBe(0)
+  })
+})

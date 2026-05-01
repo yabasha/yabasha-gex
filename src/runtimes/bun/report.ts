@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { buildReportFromNpmTree } from '../../shared/transform.js'
+import { parseBunLockfile, parsePackageLockJson } from '../../shared/lockfile.js'
 import type { OutputFormat, Report } from '../../shared/types.js'
 import { getToolVersion } from '../../shared/cli/utils.js'
 
@@ -20,6 +21,7 @@ export interface ReportOptions {
   fullTree?: boolean
   omitDev?: boolean
   cwd?: string
+  fromLockfile?: boolean
 }
 
 /**
@@ -48,12 +50,23 @@ export async function produceReport(
   const toolVersion = await getToolVersion()
   const cwd = options.cwd || process.cwd()
 
-  const tree = await bunPmLs({
-    global: ctx === 'global',
-    omitDev: ctx === 'local' ? Boolean(options.omitDev) : false,
-    cwd,
-  })
-  const nodeModulesPath = tree?.node_modules_path
+  let tree: any
+  let nodeModulesPath: string | undefined
+  if (options.fromLockfile) {
+    if (ctx === 'global') {
+      throw new Error(
+        '--from-lockfile is not supported for global packages (no lockfile available)',
+      )
+    }
+    tree = await readBunLockfileTree(cwd)
+  } else {
+    tree = await bunPmLs({
+      global: ctx === 'global',
+      omitDev: ctx === 'local' ? Boolean(options.omitDev) : false,
+      cwd,
+    })
+    nodeModulesPath = tree?.node_modules_path
+  }
 
   let project_description: string | undefined
   let project_homepage: string | undefined
@@ -73,11 +86,16 @@ export async function produceReport(
     }
   }
 
-  const resolvedRoot = nodeModulesPath
-    ? nodeModulesPath
-    : ctx === 'global'
-      ? await bunPmRootGlobal().catch(() => undefined)
-      : await bunPmRootLocal(cwd).catch(() => `${cwd}/node_modules`)
+  let resolvedRoot: string | undefined
+  if (options.fromLockfile) {
+    resolvedRoot = `${cwd}/node_modules`
+  } else if (nodeModulesPath) {
+    resolvedRoot = nodeModulesPath
+  } else if (ctx === 'global') {
+    resolvedRoot = await bunPmRootGlobal().catch(() => undefined)
+  } else {
+    resolvedRoot = await bunPmRootLocal(cwd).catch(() => `${cwd}/node_modules`)
+  }
 
   const report = await buildReportFromNpmTree(tree, {
     context: ctx,
@@ -90,4 +108,23 @@ export async function produceReport(
 
   const markdownExtras = { project_description, project_homepage, project_bugs }
   return { report, markdownExtras }
+}
+
+async function readBunLockfileTree(cwd: string): Promise<any> {
+  const bunLockPath = path.join(cwd, 'bun.lock')
+  try {
+    const raw = await readFile(bunLockPath, 'utf8')
+    return parseBunLockfile(raw, { cwd })
+  } catch {
+    // fall through to package-lock.json
+  }
+  const npmLockPath = path.join(cwd, 'package-lock.json')
+  try {
+    const raw = await readFile(npmLockPath, 'utf8')
+    return parsePackageLockJson(raw, { cwd })
+  } catch {
+    throw new Error(
+      `No lockfile found at ${bunLockPath} or ${npmLockPath} (--from-lockfile requires bun.lock or package-lock.json)`,
+    )
+  }
 }

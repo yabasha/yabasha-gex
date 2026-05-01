@@ -252,9 +252,19 @@ export function createAuditCommand(program: Command): Command {
     const fullTree = Boolean(opts.fullTree)
     const omitDev = Boolean(opts.omitDev)
     const cwd = process.cwd()
-    const failOn = parseFailOn(opts.failOn)
+
+    let failOn
+    try {
+      failOn = parseFailOn(opts.failOn)
+    } catch (err: any) {
+      console.error(err?.message || 'Invalid --fail-on value')
+      process.exitCode = 2
+      return
+    }
 
     const selection = normalizeUpdateSelection(opts.updateOutdated)
+    // outdatedResult.proceed is intentionally not honored: gex audit always continues
+    // to produce the report, regardless of --check-outdated output.
     const outdatedResult = await handleOutdatedWorkflow({
       checkOutdated: Boolean(opts.checkOutdated),
       selection,
@@ -282,6 +292,8 @@ export function createAuditCommand(program: Command): Command {
       omitDev,
     })
 
+    // applyDeprecatedCheck's `proceed` return value is intentionally ignored: the
+    // deprecated table is advisory output, but gex audit always emits the report.
     await applyDeprecatedCheck(report, {
       checkDeprecated: Boolean(opts.checkDeprecated),
       context: 'local',

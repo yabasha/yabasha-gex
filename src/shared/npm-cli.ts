@@ -1,5 +1,7 @@
 import { promisify } from 'node:util'
 
+import type { Severity } from './types.js'
+
 export type OutdatedInfo = {
   name: string
   current: string
@@ -142,8 +144,8 @@ export type NpmAuditViaEntry =
     }
 
 export type NpmAuditVulnerabilityNode = {
-  name: string
-  severity: string
+  name?: string
+  severity?: string
   isDirect?: boolean
   via?: NpmAuditViaEntry[]
   effects?: string[]
@@ -153,7 +155,8 @@ export type NpmAuditVulnerabilityNode = {
 }
 
 export type NpmAuditMetadata = {
-  vulnerabilities?: Record<string, number>
+  /** Severity → count map. Older npm versions may emit a subset of severity keys. */
+  vulnerabilities?: Partial<Record<Severity, number>> & { total?: number }
   dependencies?: {
     prod?: number
     dev?: number

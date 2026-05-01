@@ -33,7 +33,10 @@ import { produceReport } from './report.js'
  * @param options - Configuration for which options to add
  * @returns Modified command
  */
-function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolean }): Command {
+function addCommonOptions(
+  cmd: Command,
+  { allowOmitDev, allowAudit }: { allowOmitDev: boolean; allowAudit: boolean },
+): Command {
   cmd
     .option(
       '-f, --output-format <format>',
@@ -48,11 +51,15 @@ function addCommonOptions(cmd: Command, { allowOmitDev }: { allowOmitDev: boolea
       '-u, --update-outdated [packages...]',
       'Update outdated packages (omit package names to update every package)',
     )
-    .option('--audit', 'Run npm audit and include vulnerabilities in the report', false)
-    .option(
-      '--fail-on <severity>',
-      'With --audit, exit non-zero if a vulnerability of this severity or higher is found (info|low|moderate|high|critical)',
-    )
+
+  if (allowAudit) {
+    cmd
+      .option('--audit', 'Run npm audit and include vulnerabilities in the report', false)
+      .option(
+        '--fail-on <severity>',
+        'With --audit, exit non-zero if a vulnerability of this severity or higher is found (info|low|moderate|high|critical)',
+      )
+  }
 
   if (allowOmitDev) {
     cmd.option('--omit-dev', 'Exclude devDependencies (local only)', false)
@@ -80,7 +87,7 @@ export function createLocalCommand(program: Command): Command {
     .command('local', { isDefault: true })
     .description("Generate a report for the current project's dependencies")
 
-  addCommonOptions(localCmd, { allowOmitDev: true })
+  addCommonOptions(localCmd, { allowOmitDev: true, allowAudit: true })
 
   localCmd.action(async (opts) => {
     const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat
@@ -129,9 +136,9 @@ export function createLocalCommand(program: Command): Command {
     if (auditOutcome.audit) {
       report.audit = auditOutcome.audit
       if (!finalOutFile) {
-        console.log(formatAuditSummary(auditOutcome.audit.summary))
+        console.error(formatAuditSummary(auditOutcome.audit.summary))
         if (auditOutcome.audit.vulnerabilities.length > 0) {
-          console.log(formatAuditTable(auditOutcome.audit.vulnerabilities))
+          console.error(formatAuditTable(auditOutcome.audit.vulnerabilities))
         }
       }
     }
@@ -158,7 +165,7 @@ export function createGlobalCommand(program: Command): Command {
     .command('global')
     .description('Generate a report of globally installed packages')
 
-  addCommonOptions(globalCmd, { allowOmitDev: false })
+  addCommonOptions(globalCmd, { allowOmitDev: false, allowAudit: false })
 
   globalCmd.action(async (opts) => {
     const outputFormat = (opts.outputFormat ?? 'json') as OutputFormat

@@ -51,6 +51,26 @@ describe('bunAudit', () => {
     })
   })
 
+  it('passes --prod when production option is set', async () => {
+    mockExecFile.mockResolvedValue({
+      stdout: JSON.stringify({
+        vulnerabilities: {},
+        metadata: {
+          vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0 },
+        },
+      }),
+      stderr: '',
+    })
+
+    await bunAudit({ cwd: '/tmp', production: true })
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'bun',
+      ['audit', '--json', '--prod'],
+      expect.objectContaining({ cwd: '/tmp' }),
+    )
+  })
+
   it('parses stdout when bun audit exits non-zero', async () => {
     const err = Object.assign(new Error('bun audit exited 1'), {
       stdout: JSON.stringify({

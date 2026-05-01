@@ -5,6 +5,7 @@ import { parseAuditPayload } from '../../shared/npm-cli.js'
 
 export type BunAuditOptions = {
   cwd?: string
+  production?: boolean
 }
 
 async function getExecFileAsync(): Promise<
@@ -20,6 +21,7 @@ async function getExecFileAsync(): Promise<
 
 export async function bunAudit(options: BunAuditOptions = {}): Promise<AuditResult> {
   const args = ['audit', '--json']
+  if (options.production) args.push('--prod')
   try {
     const execFileAsync = await getExecFileAsync()
     const { stdout } = await execFileAsync('bun', args, {

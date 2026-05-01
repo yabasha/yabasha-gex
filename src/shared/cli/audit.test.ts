@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import type { NpmAuditRaw } from '../npm-cli.js'
 import type { BunAuditRaw } from '../../runtimes/bun/package-manager.js'
+import type { Report } from '../types.js'
 
 import {
+  attachAuditToReport,
+  formatAuditTable,
   normalizeNpmAudit,
   normalizeBunAudit,
+  parseFailOn,
   runAuditWorkflow,
   severityAtOrAbove,
 } from './audit.js'
@@ -282,5 +286,104 @@ describe('runAuditWorkflow', () => {
     })
     expect(result.summary.error).toBe('network down')
     expect(result.shouldFail).toBe(true)
+  })
+})
+
+describe('parseFailOn', () => {
+  it('returns the severity when valid', () => {
+    expect(parseFailOn('low')).toBe('low')
+    expect(parseFailOn('MODERATE')).toBe('moderate')
+    expect(parseFailOn('high')).toBe('high')
+    expect(parseFailOn('critical')).toBe('critical')
+  })
+
+  it('returns undefined for empty input', () => {
+    expect(parseFailOn(undefined)).toBeUndefined()
+    expect(parseFailOn('')).toBeUndefined()
+  })
+
+  it('throws on invalid value', () => {
+    expect(() => parseFailOn('extreme')).toThrow(/Invalid --fail-on/)
+    expect(() => parseFailOn('info')).toThrow(/Invalid --fail-on/)
+    expect(() => parseFailOn(42 as unknown)).toThrow(/Invalid --fail-on/)
+  })
+})
+
+describe('attachAuditToReport', () => {
+  it('mutates report with summary and vulnerabilities', () => {
+    const report: Report = {
+      report_version: '1.0',
+      timestamp: 't',
+      tool_version: 'v',
+      global_packages: [],
+      local_dependencies: [],
+      local_dev_dependencies: [],
+    }
+    const summary = {
+      counts: { info: 0, low: 0, moderate: 0, high: 1, critical: 0 },
+      total: 1,
+    }
+    const vulns = [
+      {
+        id: 'GHSA-1',
+        package: 'p',
+        severity: 'high' as const,
+        range: '<1',
+        title: 't',
+        url: 'u',
+      },
+    ]
+    attachAuditToReport(report, { summary, vulns })
+    expect(report.audit_summary).toEqual(summary)
+    expect(report.vulnerabilities).toEqual(vulns)
+  })
+})
+
+describe('formatAuditTable', () => {
+  it('renders error line when summary has error', () => {
+    const out = formatAuditTable([], {
+      counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 },
+      total: 0,
+      error: 'boom',
+    })
+    expect(out).toContain('boom')
+  })
+
+  it('renders "no vulnerabilities" when empty', () => {
+    const out = formatAuditTable([], {
+      counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 },
+      total: 0,
+    })
+    expect(out.toLowerCase()).toContain('no vulnerabilities')
+  })
+
+  it('renders summary line and rows sorted critical first', () => {
+    const vulns = [
+      {
+        id: '1',
+        package: 'a',
+        severity: 'low' as const,
+        range: '<1',
+        title: 'low one',
+        url: '',
+      },
+      {
+        id: '2',
+        package: 'b',
+        severity: 'critical' as const,
+        range: '<2',
+        title: 'crit one',
+        url: '',
+      },
+    ]
+    const out = formatAuditTable(vulns, {
+      counts: { info: 0, low: 1, moderate: 0, high: 0, critical: 1 },
+      total: 2,
+    })
+    expect(out).toContain('total 2')
+    const critIdx = out.indexOf('crit one')
+    const lowIdx = out.indexOf('low one')
+    expect(critIdx).toBeGreaterThan(-1)
+    expect(lowIdx).toBeGreaterThan(critIdx)
   })
 })

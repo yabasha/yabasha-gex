@@ -1,4 +1,4 @@
-import type { AuditSummary, Severity, Vulnerability } from '../types.js'
+import type { AuditSummary, Report, Severity, Vulnerability } from '../types.js'
 import type { NpmAuditRaw } from '../npm-cli.js'
 import type { BunAuditRaw } from '../../runtimes/bun/package-manager.js'
 
@@ -192,4 +192,64 @@ export async function runAuditWorkflow(opts: AuditWorkflowOptions): Promise<Audi
   }
 
   return { summary, vulns, shouldFail }
+}
+
+export function parseFailOn(value: unknown): Severity | undefined {
+  if (value == null || value === '') return undefined
+  if (typeof value !== 'string') {
+    throw new Error('Invalid --fail-on value (must be one of low|moderate|high|critical)')
+  }
+  const lower = value.toLowerCase()
+  if (lower === 'low' || lower === 'moderate' || lower === 'high' || lower === 'critical') {
+    return lower
+  }
+  throw new Error(`Invalid --fail-on value: ${value} (must be one of low|moderate|high|critical)`)
+}
+
+export function attachAuditToReport(report: Report, result: NormalizedAudit): void {
+  report.audit_summary = result.summary
+  report.vulnerabilities = result.vulns
+}
+
+export function formatAuditTable(vulns: Vulnerability[], summary: AuditSummary): string {
+  if (summary.error) {
+    return `Audit failed: ${summary.error}`
+  }
+
+  const lines: string[] = [formatAuditCounts(summary)]
+
+  if (vulns.length === 0) {
+    lines.push('No vulnerabilities found.')
+    return lines.join('\n')
+  }
+
+  lines.push('')
+
+  const sorted = [...vulns].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
+  const headers = ['Package', 'Severity', 'Range', 'ID', 'Title']
+  const rows = sorted.map((v) => [v.package, v.severity, v.range || '-', v.id, v.title || '-'])
+
+  const widths = headers.map((header, idx) =>
+    Math.max(header.length, ...rows.map((row) => row[idx].length)),
+  )
+
+  const formatRow = (cols: string[]) =>
+    cols.map((col, idx) => col.padEnd(widths[idx], ' ')).join('  ')
+
+  lines.push(formatRow(headers))
+  lines.push(formatRow(widths.map((w) => '-'.repeat(w))))
+  for (const row of rows) lines.push(formatRow(row))
+  return lines.join('\n')
+}
+
+function formatAuditCounts(summary: AuditSummary): string {
+  const c = summary.counts
+  const parts = [
+    `${c.critical} critical`,
+    `${c.high} high`,
+    `${c.moderate} moderate`,
+    `${c.low} low`,
+  ]
+  if (c.info > 0) parts.push(`${c.info} info`)
+  return `Summary: ${parts.join(' · ')} · total ${summary.total}`
 }

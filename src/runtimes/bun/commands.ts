@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises'
 import { Command } from 'commander'
 
 import type { OutputFormat } from '../../shared/types.js'
+import { createDiffCommand } from '../../shared/cli/diff-command.js'
 import { installFromReport, printFromReport } from '../../shared/cli/install.js'
 import { outputReport } from '../../shared/cli/output.js'
 import { isMarkdownReportFile, loadReportFromFile } from '../../shared/cli/parser.js'
@@ -402,6 +403,7 @@ export async function createProgram(): Promise<Command> {
   createGlobalCommand(program)
   createAuditCommand(program)
   createReadCommand(program)
+  createDiffCommand(program)
 
   return program
 }

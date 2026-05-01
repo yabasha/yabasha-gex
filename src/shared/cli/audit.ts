@@ -57,7 +57,10 @@ export function normalizeNpmAudit(raw: NpmAuditRaw): NormalizedAudit {
     for (const entry of via) {
       if (typeof entry !== 'object' || entry === null) continue
 
-      const id = entry.source != null ? String(entry.source) : `${pkgName}-${entry.title || ''}`
+      const id =
+        entry.source != null
+          ? String(entry.source)
+          : `${pkgName}-${entry.title || ''}-${entry.url || ''}-${entry.range || ''}`
       const dedupKey = `${pkgName}|${id}`
       if (seen.has(dedupKey)) continue
       seen.add(dedupKey)
@@ -109,7 +112,11 @@ export function normalizeBunAudit(raw: BunAuditRaw): NormalizedAudit {
     if (!Array.isArray(advisories)) continue
     for (const adv of advisories) {
       const ghsa = typeof adv.github_advisory_id === 'string' ? adv.github_advisory_id : undefined
-      const id = ghsa || (adv.id != null ? String(adv.id) : `${pkgName}-${adv.title || ''}`)
+      const id =
+        ghsa ||
+        (adv.id != null
+          ? String(adv.id)
+          : `${pkgName}-${adv.title || ''}-${adv.url || ''}-${adv.vulnerable_versions || ''}`)
       const dedupKey = `${pkgName}|${id}`
       if (seen.has(dedupKey)) continue
       seen.add(dedupKey)

@@ -13,6 +13,12 @@ describe('severityAtOrAbove', () => {
     expect(severityAtOrAbove(counts, 'high')).toBe(9)
     expect(severityAtOrAbove(counts, 'moderate')).toBe(12)
     expect(severityAtOrAbove(counts, 'low')).toBe(14)
+    expect(severityAtOrAbove(counts, 'info')).toBe(15)
+  })
+
+  it('returns 0 when all counts are zero', () => {
+    const zero = { info: 0, low: 0, moderate: 0, high: 0, critical: 0 }
+    expect(severityAtOrAbove(zero, 'low')).toBe(0)
   })
 })
 

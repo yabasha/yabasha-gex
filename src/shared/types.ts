@@ -17,6 +17,52 @@ export type PackageInfo = {
 }
 
 /**
+ * Severity levels emitted by the npm registry's bulk-advisories endpoint.
+ * Both `npm audit` and `bun audit` use this vocabulary; bun's --audit-level
+ * enum omits `info` but the bucket is preserved for npm parity.
+ */
+export type Severity = 'info' | 'low' | 'moderate' | 'high' | 'critical'
+
+/**
+ * A single vulnerability advisory, normalized across npm and bun audit shapes.
+ */
+export type Vulnerability = {
+  /** GHSA-xxxx or numeric advisory id, stringified */
+  id: string
+  /** Affected package name */
+  package: string
+  severity: Severity
+  /** Semver range or vulnerable_versions string */
+  range: string
+  /** Advisory title from the registry */
+  title: string
+  /** Canonical URL to the advisory */
+  url: string
+  cve?: string
+  ghsa?: string
+}
+
+/**
+ * Aggregate audit metadata. `dependencies` is npm-only; bun audit does not
+ * emit a metadata block, so it is undefined on the bun path. `error` is
+ * populated on soft-fail and carries the underlying audit failure message.
+ */
+export type AuditSummary = {
+  /** Severity → count map. All five keys are always present; absent severities map to 0. */
+  counts: Record<Severity, number>
+  total: number
+  dependencies?: {
+    prod: number
+    dev: number
+    optional: number
+    peer: number
+    peerOptional: number
+    total: number
+  }
+  error?: string
+}
+
+/**
  * Complete dependency report structure
  */
 export type Report = {
@@ -48,46 +94,3 @@ export type Report = {
  * Supported output formats for reports
  */
 export type OutputFormat = 'json' | 'md' | 'html'
-
-/**
- * Severity levels emitted by the npm registry's bulk-advisories endpoint.
- * Both `npm audit` and `bun audit` use this vocabulary; bun's --audit-level
- * enum omits `info` but the bucket is preserved for npm parity.
- */
-export type Severity = 'info' | 'low' | 'moderate' | 'high' | 'critical'
-
-/**
- * A single vulnerability advisory, normalized across npm and bun audit shapes.
- */
-export type Vulnerability = {
-  /** GHSA-xxxx or numeric advisory id, stringified */
-  id: string
-  /** Affected package name */
-  package: string
-  severity: Severity
-  /** Semver range or vulnerable_versions string */
-  range: string
-  title: string
-  url: string
-  cve?: string
-  ghsa?: string
-}
-
-/**
- * Aggregate audit metadata. `dependencies` is npm-only; bun audit does not
- * emit a metadata block, so it is undefined on the bun path. `error` is
- * populated on soft-fail and carries the underlying audit failure message.
- */
-export type AuditSummary = {
-  counts: Record<Severity, number>
-  total: number
-  dependencies?: {
-    prod: number
-    dev: number
-    optional: number
-    peer: number
-    peerOptional: number
-    total: number
-  }
-  error?: string
-}

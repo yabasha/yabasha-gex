@@ -66,12 +66,13 @@ function vulnerabilitiesSection(
   }
 
   const c = summary.counts
-  const parts: string[] = []
+  const parts = [
+    `🔴 ${c.critical} critical`,
+    `🟠 ${c.high} high`,
+    `🟡 ${c.moderate} moderate`,
+    `🔵 ${c.low} low`,
+  ]
   if (c.info > 0) parts.push(`ℹ️ ${c.info} info`)
-  parts.push(`🔴 ${c.critical} critical`)
-  parts.push(`🟠 ${c.high} high`)
-  parts.push(`🟡 ${c.moderate} moderate`)
-  parts.push(`🔵 ${c.low} low`)
   lines.push(`**Summary:** ${parts.join(' · ')} · total ${summary.total}`)
   lines.push('')
 

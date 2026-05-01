@@ -243,7 +243,7 @@ export function createAuditCommand(program: Command): Command {
   addCommonOptions(auditCmd, { allowOmitDev: true })
   auditCmd.option(
     '--fail-on <severity>',
-    'Exit non-zero when severity at or above threshold is present (low|moderate|high|critical)',
+    'Exit 1 when severity at or above threshold is present (low|moderate|high|critical). Exit 2 if the threshold itself is invalid.',
   )
 
   auditCmd.action(async (opts) => {

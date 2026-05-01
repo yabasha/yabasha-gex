@@ -4,7 +4,7 @@
 
 import type { Report } from '../types.js'
 
-type PackageManager = 'npm' | 'bun'
+type PackageManager = 'npm' | 'bun' | 'yarn' | 'pnpm'
 
 export type InstallOptions = {
   cwd: string
@@ -24,6 +24,16 @@ const INSTALL_COMMANDS: Record<
     global: ['add', '-g'],
     local: ['add'],
     dev: ['add', '-d'],
+  },
+  yarn: {
+    global: ['global', 'add'],
+    local: ['add'],
+    dev: ['add', '-D'],
+  },
+  pnpm: {
+    global: ['add', '-g'],
+    local: ['add'],
+    dev: ['add', '-D'],
   },
 }
 
@@ -74,7 +84,7 @@ export async function installFromReport(
   // Acquire execFileAsync once per run to keep logs grouped, while still mockable in tests
   const execFileAsync = await getExecFileAsync()
   const cmd = INSTALL_COMMANDS[packageManager]
-  const binary = packageManager === 'bun' ? 'bun' : 'npm'
+  const binary = packageManager === 'npm' ? 'npm' : packageManager
 
   if (globalPkgs.length > 0) {
     console.log(`Installing global: ${globalPkgs.join(' ')}`)

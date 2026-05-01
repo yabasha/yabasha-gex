@@ -18,6 +18,8 @@
     "gex": "./dist/cli.cjs",
     "gex-node": "./dist/cli-node.cjs",
     "gex-bun": "./dist/cli-bun.mjs",
+    "gex-yarn": "./dist/cli-yarn.cjs",
+    "gex-pnpm": "./dist/cli-pnpm.cjs",
     "gb": "./dist/cli-bun.mjs",
     "gn": "./dist/cli-node.cjs"
   },

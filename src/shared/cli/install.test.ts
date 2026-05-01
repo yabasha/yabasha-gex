@@ -81,6 +81,54 @@ describe('installFromReport', () => {
     )
   })
 
+  it('installs packages with yarn when requested', async () => {
+    await installFromReport(baseReport, { cwd: '/tmp/project', packageManager: 'yarn' })
+
+    expect(execFileAsync).toHaveBeenCalledTimes(3)
+    expect(execFileAsync).toHaveBeenNthCalledWith(
+      1,
+      'yarn',
+      ['global', 'add', '@scope/pkg@1.0.0'],
+      expect.objectContaining({ cwd: '/tmp/project' }),
+    )
+    expect(execFileAsync).toHaveBeenNthCalledWith(
+      2,
+      'yarn',
+      ['add', 'dep@2.0.0'],
+      expect.objectContaining({ cwd: '/tmp/project' }),
+    )
+    expect(execFileAsync).toHaveBeenNthCalledWith(
+      3,
+      'yarn',
+      ['add', '-D', 'dev-dep'],
+      expect.objectContaining({ cwd: '/tmp/project' }),
+    )
+  })
+
+  it('installs packages with pnpm when requested', async () => {
+    await installFromReport(baseReport, { cwd: '/tmp/project', packageManager: 'pnpm' })
+
+    expect(execFileAsync).toHaveBeenCalledTimes(3)
+    expect(execFileAsync).toHaveBeenNthCalledWith(
+      1,
+      'pnpm',
+      ['add', '-g', '@scope/pkg@1.0.0'],
+      expect.objectContaining({ cwd: '/tmp/project' }),
+    )
+    expect(execFileAsync).toHaveBeenNthCalledWith(
+      2,
+      'pnpm',
+      ['add', 'dep@2.0.0'],
+      expect.objectContaining({ cwd: '/tmp/project' }),
+    )
+    expect(execFileAsync).toHaveBeenNthCalledWith(
+      3,
+      'pnpm',
+      ['add', '-D', 'dev-dep'],
+      expect.objectContaining({ cwd: '/tmp/project' }),
+    )
+  })
+
   it('skips installation when no packages are present', async () => {
     await installFromReport(
       {

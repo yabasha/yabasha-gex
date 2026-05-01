@@ -141,3 +141,48 @@ export function normalizeBunAudit(raw: BunAuditRaw): NormalizedAudit {
   for (const v of vulns) counts[v.severity] += 1
   return { summary: { counts, total: vulns.length }, vulns }
 }
+
+export type AuditNormalizer = (raw: unknown) => NormalizedAudit
+
+export type AuditWorkflowOptions = {
+  runAudit: () => Promise<unknown>
+  normalize: AuditNormalizer
+  failOn?: Severity
+  outFile?: string
+}
+
+export type AuditWorkflowResult = {
+  summary: AuditSummary
+  vulns: Vulnerability[]
+  shouldFail: boolean
+}
+
+export async function runAuditWorkflow(opts: AuditWorkflowOptions): Promise<AuditWorkflowResult> {
+  let summary: AuditSummary
+  let vulns: Vulnerability[]
+
+  try {
+    const raw = await opts.runAudit()
+    const normalized = opts.normalize(raw)
+    summary = normalized.summary
+    vulns = normalized.vulns
+  } catch (error: any) {
+    summary = {
+      counts: emptyCounts(),
+      total: 0,
+      error: error?.message || 'audit failed',
+    }
+    vulns = []
+  }
+
+  let shouldFail = false
+  if (opts.failOn) {
+    if (summary.error) {
+      shouldFail = true
+    } else {
+      shouldFail = severityAtOrAbove(summary.counts, opts.failOn) > 0
+    }
+  }
+
+  return { summary, vulns, shouldFail }
+}

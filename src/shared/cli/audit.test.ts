@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest'
 import type { NpmAuditRaw } from '../npm-cli.js'
 import type { BunAuditRaw } from '../../runtimes/bun/package-manager.js'
 
-import { normalizeNpmAudit, normalizeBunAudit, severityAtOrAbove } from './audit.js'
+import {
+  normalizeNpmAudit,
+  normalizeBunAudit,
+  runAuditWorkflow,
+  severityAtOrAbove,
+} from './audit.js'
 
 describe('severityAtOrAbove', () => {
   const counts = { info: 1, low: 2, moderate: 3, high: 4, critical: 5 }
@@ -174,5 +179,83 @@ describe('normalizeBunAudit', () => {
     const { summary, vulns } = normalizeBunAudit({})
     expect(vulns).toEqual([])
     expect(summary.total).toBe(0)
+  })
+})
+
+describe('runAuditWorkflow', () => {
+  const successResult = {
+    summary: {
+      counts: { info: 0, low: 0, moderate: 0, high: 1, critical: 0 },
+      total: 1,
+    },
+    vulns: [
+      {
+        id: '1',
+        package: 'p',
+        severity: 'high' as const,
+        range: '<1',
+        title: 't',
+        url: 'u',
+      },
+    ],
+  }
+
+  it('returns normalized data when audit succeeds and shouldFail=false without failOn', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => ({}),
+      normalize: () => successResult,
+    })
+    expect(result.summary).toEqual(successResult.summary)
+    expect(result.vulns).toEqual(successResult.vulns)
+    expect(result.shouldFail).toBe(false)
+  })
+
+  it('shouldFail=true when threshold met', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => ({}),
+      normalize: () => successResult,
+      failOn: 'high',
+    })
+    expect(result.shouldFail).toBe(true)
+  })
+
+  it('shouldFail=false when below threshold', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => ({}),
+      normalize: () => successResult,
+      failOn: 'critical',
+    })
+    expect(result.shouldFail).toBe(false)
+  })
+
+  it('soft-fails on runAudit error: error captured, vulns empty, shouldFail=false without failOn', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => {
+        throw new Error('network down')
+      },
+      normalize: () => {
+        throw new Error('should not be called')
+      },
+    })
+    expect(result.summary.error).toBe('network down')
+    expect(result.summary.total).toBe(0)
+    expect(result.summary.counts).toEqual({ info: 0, low: 0, moderate: 0, high: 0, critical: 0 })
+    expect(result.vulns).toEqual([])
+    expect(result.shouldFail).toBe(false)
+  })
+
+  it('soft-fail with failOn set: shouldFail=true', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => {
+        throw new Error('network down')
+      },
+      normalize: () => ({
+        summary: { counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 }, total: 0 },
+        vulns: [],
+      }),
+      failOn: 'low',
+    })
+    expect(result.summary.error).toBe('network down')
+    expect(result.shouldFail).toBe(true)
   })
 })

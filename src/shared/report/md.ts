@@ -2,6 +2,7 @@
  * @fileoverview Markdown report rendering utilities
  */
 
+import { SEVERITY_RANK } from '../cli/audit.js'
 import type { AuditSummary, PackageInfo, Report, Severity, Vulnerability } from '../types.js'
 
 /**
@@ -43,14 +44,6 @@ function packageRows(
   return { headers, rows }
 }
 
-const SEVERITY_RANK_MD: Record<Severity, number> = {
-  info: 0,
-  low: 1,
-  moderate: 2,
-  high: 3,
-  critical: 4,
-}
-
 const SEVERITY_EMOJI: Record<Severity, string> = {
   info: 'ℹ️',
   low: '🔵',
@@ -89,9 +82,7 @@ function vulnerabilitiesSection(
     return lines
   }
 
-  const sorted = [...list].sort(
-    (a, b) => SEVERITY_RANK_MD[b.severity] - SEVERITY_RANK_MD[a.severity],
-  )
+  const sorted = [...list].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
   const headers = ['Package', 'Severity', 'Range', 'ID', 'Title']
   const rows = sorted.map((v) => [
     v.package,

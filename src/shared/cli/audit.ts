@@ -4,7 +4,8 @@ import type { BunAuditRaw } from '../../runtimes/bun/package-manager.js'
 
 const SEVERITIES: Severity[] = ['info', 'low', 'moderate', 'high', 'critical']
 
-const SEVERITY_RANK: Record<Severity, number> = {
+/** Severity → ordinal rank. Single source of truth for severity ordering across the audit module and renderers. */
+export const SEVERITY_RANK: Record<Severity, number> = {
   info: 0,
   low: 1,
   moderate: 2,

@@ -330,4 +330,17 @@ describe('vulnerabilities section', () => {
     expect(out).toContain('## Vulnerabilities')
     expect(out).toContain('No vulnerabilities found.')
   })
+
+  it('prepends an info segment to the summary line when info count is greater than zero', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 3, low: 0, moderate: 0, high: 0, critical: 0 },
+        total: 3,
+      },
+      vulnerabilities: [],
+    })
+    expect(out).toContain('ℹ️ 3 info')
+    expect(out).toContain('🔴 0 critical')
+  })
 })

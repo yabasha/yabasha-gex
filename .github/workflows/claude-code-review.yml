@@ -30,11 +30,6 @@ jobs:
   claude-review:
     needs: check-auth
     if: needs.check-auth.outputs.has_auth == 'true'
-    # Advisory review — failures here should not block the PR. Authentication
-    # backend issues (e.g. org-level subscription changes) surface as job
-    # failures; keeping this non-blocking lets contributors land work while
-    # the maintainer reconciles auth.
-    continue-on-error: true
 
     runs-on: ubuntu-latest
     permissions:
@@ -51,6 +46,11 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
+        # Advisory review — failures here should not block the PR. Auth-backend
+        # issues (e.g. org-level subscription changes that disable Claude Code
+        # access) surface as step failures; continue-on-error lets the job
+        # report success so contributors aren't gated on advisory checks.
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           # Prefer ANTHROPIC_API_KEY (recommended by Anthropic for CI).

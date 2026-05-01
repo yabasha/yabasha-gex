@@ -7,7 +7,7 @@ import {
   applyDeprecatedCheck,
   attachDeprecatedToReport,
   buildDeprecatedEntries,
-  collectReportPackageNames,
+  collectReportPackages,
   fetchDeprecations,
   formatDeprecatedTable,
   handleDeprecatedWorkflow,
@@ -25,19 +25,25 @@ describe('deprecated utils', () => {
     mockNpmViewDeprecated.mockReset()
   })
 
-  it('fetchDeprecations returns a name -> message|null map', async () => {
-    mockNpmViewDeprecated.mockImplementation(async (name: string) => {
-      if (name === 'request') return 'use a maintained alternative'
-      if (name === 'left-pad') return 'no longer maintained'
+  it('fetchDeprecations returns a name@version -> message|null map and queries by version', async () => {
+    mockNpmViewDeprecated.mockImplementation(async (name: string, version?: string) => {
+      if (name === 'request' && version === '2.88.2') return 'use a maintained alternative'
+      if (name === 'left-pad' && version === '1.3.0') return 'no longer maintained'
       return null
     })
 
-    const result = await fetchDeprecations(['request', 'lodash', 'left-pad'])
+    const result = await fetchDeprecations([
+      { name: 'request', version: '2.88.2' },
+      { name: 'lodash', version: '4.17.21' },
+      { name: 'left-pad', version: '1.3.0' },
+    ])
 
-    expect(result.get('request')).toBe('use a maintained alternative')
-    expect(result.get('lodash')).toBeNull()
-    expect(result.get('left-pad')).toBe('no longer maintained')
+    expect(result.get('request@2.88.2')).toBe('use a maintained alternative')
+    expect(result.get('lodash@4.17.21')).toBeNull()
+    expect(result.get('left-pad@1.3.0')).toBe('no longer maintained')
     expect(mockNpmViewDeprecated).toHaveBeenCalledTimes(3)
+    expect(mockNpmViewDeprecated).toHaveBeenCalledWith('request', '2.88.2')
+    expect(mockNpmViewDeprecated).toHaveBeenCalledWith('left-pad', '1.3.0')
   })
 
   it('fetchDeprecations batches by concurrency', async () => {
@@ -51,8 +57,8 @@ describe('deprecated utils', () => {
       return null
     })
 
-    const names = Array.from({ length: 20 }, (_, i) => `pkg-${i}`)
-    await fetchDeprecations(names, 4)
+    const lookups = Array.from({ length: 20 }, (_, i) => ({ name: `pkg-${i}`, version: '1.0.0' }))
+    await fetchDeprecations(lookups, 4)
 
     expect(maxInFlight).toBeLessThanOrEqual(4)
     expect(mockNpmViewDeprecated).toHaveBeenCalledTimes(20)
@@ -64,16 +70,35 @@ describe('deprecated utils', () => {
       return null
     })
 
-    const result = await fetchDeprecations(['broken', 'ok'])
-    expect(result.get('broken')).toBeNull()
-    expect(result.get('ok')).toBeNull()
+    const result = await fetchDeprecations([
+      { name: 'broken', version: '1.0.0' },
+      { name: 'ok', version: '1.0.0' },
+    ])
+    expect(result.get('broken@1.0.0')).toBeNull()
+    expect(result.get('ok@1.0.0')).toBeNull()
+  })
+
+  it('fetchDeprecations distinguishes the same package at different versions', async () => {
+    mockNpmViewDeprecated.mockImplementation(async (name: string, version?: string) => {
+      if (name === 'pkg' && version === '1.0.0') return 'old version archived'
+      if (name === 'pkg' && version === '2.0.0') return null
+      return null
+    })
+
+    const result = await fetchDeprecations([
+      { name: 'pkg', version: '1.0.0' },
+      { name: 'pkg', version: '2.0.0' },
+    ])
+    expect(result.get('pkg@1.0.0')).toBe('old version archived')
+    expect(result.get('pkg@2.0.0')).toBeNull()
+    expect(mockNpmViewDeprecated).toHaveBeenCalledTimes(2)
   })
 
   it('buildDeprecatedEntries filters non-deprecated and shapes rows', () => {
     const map = new Map<string, string | null>([
-      ['a', 'use b'],
-      ['b', null],
-      ['c', 'no longer maintained'],
+      ['a@1.0.0', 'use b'],
+      ['b@2.0.0', null],
+      ['c@3.0.0', 'no longer maintained'],
     ])
 
     const entries = buildDeprecatedEntries(
@@ -92,7 +117,7 @@ describe('deprecated utils', () => {
   })
 
   it('buildDeprecatedEntries dedupes the same package name across types', () => {
-    const map = new Map<string, string | null>([['a', 'use b']])
+    const map = new Map<string, string | null>([['a@1.0.0', 'use b']])
 
     const entries = buildDeprecatedEntries(
       [
@@ -103,6 +128,14 @@ describe('deprecated utils', () => {
     )
 
     expect(entries).toHaveLength(1)
+  })
+
+  it('buildDeprecatedEntries does not match a different installed version', () => {
+    const map = new Map<string, string | null>([['a@1.0.0', 'use b']])
+
+    const entries = buildDeprecatedEntries([{ name: 'a', version: '2.0.0', type: 'prod' }], map)
+
+    expect(entries).toEqual([])
   })
 
   it('formatDeprecatedTable renders headers and rows', () => {
@@ -134,7 +167,7 @@ describe('deprecated utils', () => {
   })
 
   it('handleDeprecatedWorkflow runs the fetcher and skips report when no outFile', async () => {
-    const fetchSpy = vi.fn(async () => new Map([['a', 'gone']]))
+    const fetchSpy = vi.fn(async () => new Map([['a@1.0.0', 'gone']]))
 
     const result = await handleDeprecatedWorkflow({
       checkDeprecated: true,
@@ -143,7 +176,7 @@ describe('deprecated utils', () => {
     })
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(result.deprecations.get('a')).toBe('gone')
+    expect(result.deprecations.get('a@1.0.0')).toBe('gone')
     expect(result.proceed).toBe(false)
   })
 
@@ -160,24 +193,39 @@ describe('deprecated utils', () => {
     expect(result.proceed).toBe(true)
   })
 
-  it('collectReportPackageNames returns unique names across all sections', () => {
+  it('collectReportPackages returns unique (name, version) pairs across all sections', () => {
     const report: Report = {
       report_version: '1.0',
       timestamp: 'now',
       tool_version: 't',
-      global_packages: [{ name: 'g1', version: '1', resolved_path: '/g1' }],
+      global_packages: [{ name: 'g1', version: '1.0.0', resolved_path: '/g1' }],
       local_dependencies: [
-        { name: 'a', version: '1', resolved_path: '/a' },
-        { name: 'b', version: '1', resolved_path: '/b' },
+        { name: 'a', version: '1.0.0', resolved_path: '/a' },
+        { name: 'b', version: '1.0.0', resolved_path: '/b' },
       ],
       local_dev_dependencies: [
-        { name: 'a', version: '1', resolved_path: '/a' },
-        { name: 'c', version: '1', resolved_path: '/c' },
+        { name: 'a', version: '1.0.0', resolved_path: '/a' },
+        { name: 'c', version: '1.0.0', resolved_path: '/c' },
       ],
     }
 
-    const names = collectReportPackageNames(report)
-    expect(names.sort()).toEqual(['a', 'b', 'c', 'g1'])
+    const lookups = collectReportPackages(report)
+    const keys = lookups.map((l) => `${l.name}@${l.version}`).sort()
+    expect(keys).toEqual(['a@1.0.0', 'b@1.0.0', 'c@1.0.0', 'g1@1.0.0'])
+  })
+
+  it('collectReportPackages keeps the same package at different versions as separate lookups', () => {
+    const report: Report = {
+      report_version: '1.0',
+      timestamp: 'now',
+      tool_version: 't',
+      global_packages: [{ name: 'pkg', version: '1.0.0', resolved_path: '/g' }],
+      local_dependencies: [{ name: 'pkg', version: '2.0.0', resolved_path: '/l' }],
+      local_dev_dependencies: [],
+    }
+
+    const lookups = collectReportPackages(report)
+    expect(lookups.map((l) => `${l.name}@${l.version}`).sort()).toEqual(['pkg@1.0.0', 'pkg@2.0.0'])
   })
 
   it('attachDeprecatedToReport sets deprecated on each matching package', () => {
@@ -194,9 +242,9 @@ describe('deprecated utils', () => {
     }
 
     const deprecations = new Map<string, string | null>([
-      ['request', 'use undici'],
-      ['lodash', null],
-      ['left-pad', 'one-liner of shame'],
+      ['request@2', 'use undici'],
+      ['lodash@4', null],
+      ['left-pad@1', 'one-liner of shame'],
     ])
 
     attachDeprecatedToReport(report, deprecations)
@@ -205,6 +253,23 @@ describe('deprecated utils', () => {
     expect(report.local_dependencies[0].deprecated).toBe('use undici')
     expect(report.local_dependencies[1].deprecated).toBeNull()
     expect(report.local_dev_dependencies[0].deprecated).toBe('use undici')
+  })
+
+  it('attachDeprecatedToReport does not match a different installed version', () => {
+    const report: Report = {
+      report_version: '1.0',
+      timestamp: 'now',
+      tool_version: 't',
+      global_packages: [],
+      local_dependencies: [{ name: 'pkg', version: '2.0.0', resolved_path: '/p' }],
+      local_dev_dependencies: [],
+    }
+
+    const deprecations = new Map<string, string | null>([['pkg@1.0.0', 'old version archived']])
+
+    attachDeprecatedToReport(report, deprecations)
+
+    expect(report.local_dependencies[0]).not.toHaveProperty('deprecated')
   })
 
   it('applyDeprecatedCheck returns { proceed: true } when checkDeprecated is false', async () => {

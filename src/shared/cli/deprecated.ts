@@ -16,28 +16,51 @@ export type DeprecatedEntry = {
   message: string
 }
 
+/**
+ * Identity of a package whose deprecation status we want to look up.
+ * `version` is the *installed* version (from `npm ls` / lockfile / node_modules),
+ * which is what the registry should be queried against — querying by name
+ * alone returns the latest version's deprecated field and is misleading for
+ * pinned projects.
+ */
+export type DeprecationLookup = {
+  name: string
+  version: string
+}
+
+function lookupKey(lookup: { name: string; version: string }): string {
+  return `${lookup.name}@${lookup.version}`
+}
+
 export async function fetchDeprecations(
-  names: string[],
+  packages: DeprecationLookup[],
   concurrency = 8,
 ): Promise<Map<string, string | null>> {
   const result = new Map<string, string | null>()
-  const unique = Array.from(new Set(names))
+  const seen = new Set<string>()
+  const unique: DeprecationLookup[] = []
+  for (const pkg of packages) {
+    const key = lookupKey(pkg)
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(pkg)
+  }
   const limit = Math.max(1, concurrency)
 
   for (let i = 0; i < unique.length; i += limit) {
     const batch = unique.slice(i, i + limit)
     const settled = await Promise.all(
-      batch.map(async (name) => {
+      batch.map(async (pkg) => {
         try {
-          const message = await npmViewDeprecated(name)
-          return [name, message] as const
+          const message = await npmViewDeprecated(pkg.name, pkg.version)
+          return [lookupKey(pkg), message] as const
         } catch {
-          return [name, null] as const
+          return [lookupKey(pkg), null] as const
         }
       }),
     )
-    for (const [name, message] of settled) {
-      result.set(name, message)
+    for (const [key, message] of settled) {
+      result.set(key, message)
     }
   }
 
@@ -51,7 +74,7 @@ export function buildDeprecatedEntries(
   const seen = new Set<string>()
   const entries: DeprecatedEntry[] = []
   for (const pkg of packages) {
-    const message = deprecations.get(pkg.name)
+    const message = deprecations.get(`${pkg.name}@${pkg.version || ''}`)
     if (!message) continue
     const key = `${pkg.name}@${pkg.version || ''}|${pkg.type || ''}`
     if (seen.has(key)) continue
@@ -89,12 +112,28 @@ export function formatDeprecatedTable(entries: DeprecatedEntry[]): string {
   return lines.join('\n')
 }
 
-export function collectReportPackageNames(report: Report): string[] {
-  const names = new Set<string>()
-  for (const pkg of report.global_packages) names.add(pkg.name)
-  for (const pkg of report.local_dependencies) names.add(pkg.name)
-  for (const pkg of report.local_dev_dependencies) names.add(pkg.name)
-  return Array.from(names)
+/**
+ * Collects all (name, version) pairs from a report, deduplicated. The same
+ * package appearing in multiple sections at the same version is listed once;
+ * the same package at different versions across sections is listed twice.
+ */
+export function collectReportPackages(report: Report): DeprecationLookup[] {
+  const seen = new Set<string>()
+  const out: DeprecationLookup[] = []
+  for (const section of [
+    report.global_packages,
+    report.local_dependencies,
+    report.local_dev_dependencies,
+  ]) {
+    for (const pkg of section) {
+      const lookup = { name: pkg.name, version: pkg.version || '' }
+      const key = lookupKey(lookup)
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(lookup)
+    }
+  }
+  return out
 }
 
 export function attachDeprecatedToReport(
@@ -104,8 +143,9 @@ export function attachDeprecatedToReport(
   const apply = (sections: Report['global_packages'][]): void => {
     for (const section of sections) {
       for (const pkg of section) {
-        if (deprecations.has(pkg.name)) {
-          pkg.deprecated = deprecations.get(pkg.name) ?? null
+        const key = lookupKey({ name: pkg.name, version: pkg.version || '' })
+        if (deprecations.has(key)) {
+          pkg.deprecated = deprecations.get(key) ?? null
         }
       }
     }
@@ -157,11 +197,11 @@ export async function applyDeprecatedCheck(
 ): Promise<ApplyDeprecatedCheckResult> {
   if (!opts.checkDeprecated) return { proceed: true }
 
-  const names = collectReportPackageNames(report)
+  const lookups = collectReportPackages(report)
   const { deprecations } = await handleDeprecatedWorkflow({
     checkDeprecated: true,
     outFile: opts.outFile,
-    fetchDeprecations: () => fetchDeprecations(names, opts.concurrency),
+    fetchDeprecations: () => fetchDeprecations(lookups, opts.concurrency),
   })
 
   attachDeprecatedToReport(report, deprecations)

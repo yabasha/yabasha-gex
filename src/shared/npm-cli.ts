@@ -93,11 +93,22 @@ function formatNpmError(error: any, commandLabel: string): Error {
   return new Error(`${commandLabel} failed: ${message}`)
 }
 
-export async function npmViewDeprecated(packageName: string): Promise<string | null> {
+/**
+ * Reads the `deprecated` field from the npm registry for a specific package
+ * version. When `version` is provided, the spec passed to `npm view` is
+ * `name@version` so the result reflects the *installed* version rather than
+ * the latest published version. Without a version, the query falls back to
+ * the latest, which can produce false positives/negatives in pinned projects.
+ */
+export async function npmViewDeprecated(
+  packageName: string,
+  version?: string,
+): Promise<string | null> {
+  const spec = version ? `${packageName}@${version}` : packageName
   let stdout: string
   try {
     const execFileAsync = await getExecFileAsync()
-    const result = await execFileAsync('npm', ['view', packageName, 'deprecated', '--json'], {
+    const result = await execFileAsync('npm', ['view', spec, 'deprecated', '--json'], {
       maxBuffer: 5 * 1024 * 1024,
     })
     stdout = result.stdout

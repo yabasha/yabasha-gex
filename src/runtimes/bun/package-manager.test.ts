@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { bunPmLs } from './package-manager.js'
+import { bunAudit, bunPmLs } from './package-manager.js'
 
 const mockReadFile = vi.fn()
 const mockReaddir = vi.fn()
@@ -13,6 +13,16 @@ vi.mock('node:fs/promises', () => ({
   access: (...args: any[]) => mockAccess(...args),
   stat: (...args: any[]) => mockStat(...args),
 }))
+
+vi.mock('node:child_process', () => ({
+  execFile: vi.fn(),
+}))
+vi.mock('node:util', () => ({
+  promisify: (fn: any) => fn,
+}))
+
+const childProcessMock = await import('node:child_process')
+const mockExecFile = vi.mocked(childProcessMock.execFile)
 
 const files = new Map<string, string>()
 const dirEntries = new Map<string, any[]>()
@@ -185,5 +195,78 @@ describe('bun package manager helpers', () => {
       version: '^2.0.0',
       path: '/repo/node_modules/bar',
     })
+  })
+})
+
+describe('bunAudit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('parses successful bun audit JSON', async () => {
+    const auditJson = {
+      lodash: [
+        {
+          id: 1065,
+          github_advisory_id: 'GHSA-xxxx-xxxx-xxxx',
+          severity: 'high',
+          title: 'Prototype pollution',
+          url: 'https://github.com/advisories/GHSA-xxxx-xxxx-xxxx',
+          vulnerable_versions: '<4.17.21',
+          module_name: 'lodash',
+          cves: ['CVE-2020-8203'],
+        },
+      ],
+    }
+    mockExecFile.mockResolvedValue({ stdout: JSON.stringify(auditJson), stderr: '' })
+
+    const result = await bunAudit({ cwd: '/tmp' })
+    expect(result).toEqual(auditJson)
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'bun',
+      ['audit', '--json'],
+      expect.objectContaining({ cwd: '/tmp' }),
+    )
+  })
+
+  it('passes --prod when omitDev is set', async () => {
+    mockExecFile.mockResolvedValue({ stdout: '{}', stderr: '' })
+    await bunAudit({ cwd: '/tmp', omitDev: true })
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'bun',
+      ['audit', '--json', '--prod'],
+      expect.any(Object),
+    )
+  })
+
+  it('treats non-zero exit with parseable stdout as success', async () => {
+    const auditJson = { lodash: [] }
+    const error: any = new Error('bun exited with code 1')
+    error.stdout = JSON.stringify(auditJson)
+    error.stderr = ''
+    mockExecFile.mockRejectedValue(error)
+
+    const result = await bunAudit({})
+    expect(result).toEqual(auditJson)
+  })
+
+  it('throws when stdout is empty and exec failed', async () => {
+    const error: any = new Error('ENOENT')
+    error.stdout = ''
+    error.stderr = 'bun: command not found'
+    mockExecFile.mockRejectedValue(error)
+
+    await expect(bunAudit({})).rejects.toThrow(/bun audit failed/)
+  })
+
+  it('throws on malformed JSON', async () => {
+    mockExecFile.mockResolvedValue({ stdout: 'not json', stderr: '' })
+    await expect(bunAudit({})).rejects.toThrow(/malformed JSON/)
+  })
+
+  it('returns empty object when stdout is empty', async () => {
+    mockExecFile.mockResolvedValue({ stdout: '', stderr: '' })
+    const result = await bunAudit({})
+    expect(result).toEqual({})
   })
 })

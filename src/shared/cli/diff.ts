@@ -92,9 +92,14 @@ function diffSection(oldList: PackageInfo[], newList: PackageInfo[]): SectionDif
       continue
     }
     if (prev.version === pkg.version) continue
-    const cmp = compareVersions(prev.version, pkg.version)
+    let cmp = compareVersions(prev.version, pkg.version)
+    if (cmp === 0) {
+      // Versions differ as strings but tie on semver precedence (e.g. build metadata).
+      // Fall back to lexicographic order so the change is still surfaced in the diff.
+      cmp = prev.version < pkg.version ? -1 : 1
+    }
     if (cmp < 0) upgraded.push({ name, from: prev.version, to: pkg.version })
-    else if (cmp > 0) downgraded.push({ name, from: prev.version, to: pkg.version })
+    else downgraded.push({ name, from: prev.version, to: pkg.version })
   }
 
   for (const [name, pkg] of oldByName) {
@@ -189,7 +194,7 @@ export function formatDiffSummary(diff: ReportDiff): string {
 
 export function formatDiffMarkdown(diff: ReportDiff): string {
   const lines: string[] = []
-  lines.push('# GEX Report Diff')
+  lines.push('# GEX Diff')
   lines.push('')
   lines.push(formatDiffSummary(diff))
   lines.push('')

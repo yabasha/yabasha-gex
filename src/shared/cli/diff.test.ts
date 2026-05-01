@@ -87,6 +87,16 @@ describe('diffReports', () => {
     expect(diff.local_dependencies.upgraded).toEqual([{ name: 'foo', from: 'a', to: 'b' }])
   })
 
+  it('surfaces version-string changes that tie on semver precedence', () => {
+    const old = emptyReport({ local_dependencies: [pkg('foo', '1.2.3+build1')] })
+    const next = emptyReport({ local_dependencies: [pkg('foo', '1.2.3+build2')] })
+
+    const diff = diffReports(old, next)
+    const changes = [...diff.local_dependencies.upgraded, ...diff.local_dependencies.downgraded]
+    expect(changes).toEqual([{ name: 'foo', from: '1.2.3+build1', to: '1.2.3+build2' }])
+    expect(diff.totals.added + diff.totals.removed).toBe(0)
+  })
+
   it('does not list packages with identical versions', () => {
     const old = emptyReport({ local_dependencies: [pkg('axios', '1.0.0')] })
     const next = emptyReport({ local_dependencies: [pkg('axios', '1.0.0')] })
@@ -151,7 +161,8 @@ describe('formatDiffMarkdown', () => {
   it('renders an empty diff as a no-changes section', () => {
     const diff = diffReports(emptyReport(), emptyReport())
     const md = formatDiffMarkdown(diff)
-    expect(md).toContain('# GEX Report Diff')
+    expect(md).toContain('# GEX Diff')
+    expect(md.startsWith('# GEX Report')).toBe(false)
     expect(md).toContain('_No changes_')
   })
 

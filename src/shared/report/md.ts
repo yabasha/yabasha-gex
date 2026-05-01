@@ -2,7 +2,7 @@
  * @fileoverview Markdown report rendering utilities
  */
 
-import type { PackageInfo, Report } from '../types.js'
+import type { AuditSummary, PackageInfo, Report, Severity, Vulnerability } from '../types.js'
 
 /**
  * Creates a markdown table from headers and row data
@@ -41,6 +41,68 @@ function packageRows(
     return showDeprecated ? [...base, deprecationCell(p)] : base
   })
   return { headers, rows }
+}
+
+const SEVERITY_RANK_MD: Record<Severity, number> = {
+  info: 0,
+  low: 1,
+  moderate: 2,
+  high: 3,
+  critical: 4,
+}
+
+const SEVERITY_EMOJI: Record<Severity, string> = {
+  info: 'ℹ️',
+  low: '🔵',
+  moderate: '🟡',
+  high: '🟠',
+  critical: '🔴',
+}
+
+function vulnerabilitiesSection(
+  summary: AuditSummary | undefined,
+  vulns: Vulnerability[] | undefined,
+): string[] {
+  if (!summary) return []
+  const lines: string[] = ['## Vulnerabilities', '']
+
+  if (summary.error) {
+    lines.push(`_Audit failed: ${summary.error}_`)
+    lines.push('')
+    return lines
+  }
+
+  const c = summary.counts
+  const parts: string[] = []
+  if (c.info > 0) parts.push(`ℹ️ ${c.info} info`)
+  parts.push(`🔴 ${c.critical} critical`)
+  parts.push(`🟠 ${c.high} high`)
+  parts.push(`🟡 ${c.moderate} moderate`)
+  parts.push(`🔵 ${c.low} low`)
+  lines.push(`**Summary:** ${parts.join(' · ')} · total ${summary.total}`)
+  lines.push('')
+
+  const list = vulns || []
+  if (list.length === 0) {
+    lines.push('No vulnerabilities found.')
+    lines.push('')
+    return lines
+  }
+
+  const sorted = [...list].sort(
+    (a, b) => SEVERITY_RANK_MD[b.severity] - SEVERITY_RANK_MD[a.severity],
+  )
+  const headers = ['Package', 'Severity', 'Range', 'ID', 'Title']
+  const rows = sorted.map((v) => [
+    v.package,
+    `${SEVERITY_EMOJI[v.severity]} ${v.severity}`,
+    v.range || '',
+    v.id,
+    v.title || '',
+  ])
+  lines.push(table(headers, rows))
+  lines.push('')
+  return lines
 }
 
 /**
@@ -127,6 +189,10 @@ export function renderMarkdown(
     )
     lines.push(table(headers, rows))
     lines.push('')
+  }
+
+  for (const line of vulnerabilitiesSection(report.audit_summary, report.vulnerabilities)) {
+    lines.push(line)
   }
 
   lines.push('---')

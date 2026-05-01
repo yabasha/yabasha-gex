@@ -252,3 +252,82 @@ describe('renderMarkdown', () => {
     expect(result).not.toContain('- Version:')
   })
 })
+
+describe('vulnerabilities section', () => {
+  const baseReport = {
+    report_version: '1.0',
+    timestamp: 't',
+    tool_version: 'v',
+    global_packages: [],
+    local_dependencies: [],
+    local_dev_dependencies: [],
+  }
+
+  it('omits the section when audit_summary is absent', () => {
+    const out = renderMarkdown(baseReport)
+    expect(out).not.toContain('## Vulnerabilities')
+  })
+
+  it('renders summary line and table when vulns are present', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 0, low: 0, moderate: 0, high: 1, critical: 1 },
+        total: 2,
+      },
+      vulnerabilities: [
+        {
+          id: 'GHSA-1',
+          package: 'lodash',
+          severity: 'critical',
+          range: '<4.17.21',
+          title: 'Prototype Pollution',
+          url: 'https://example.com',
+        },
+        {
+          id: '2',
+          package: 'axios',
+          severity: 'high',
+          range: '<1',
+          title: 'SSRF',
+          url: 'https://example.com',
+        },
+      ],
+    })
+    expect(out).toContain('## Vulnerabilities')
+    expect(out).toContain('🔴 1 critical')
+    expect(out).toContain('🟠 1 high')
+    expect(out).toContain('total 2')
+    expect(out).toContain('| Package | Severity | Range | ID | Title |')
+    expect(out).toContain('lodash')
+    expect(out).toContain('GHSA-1')
+    expect(out.indexOf('lodash')).toBeLessThan(out.indexOf('axios'))
+  })
+
+  it('renders an italicized warning when audit failed (error in summary)', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 },
+        total: 0,
+        error: 'network down',
+      },
+    })
+    expect(out).toContain('## Vulnerabilities')
+    expect(out).toContain('_Audit failed: network down_')
+    expect(out).not.toContain('| Package |')
+  })
+
+  it('renders "No vulnerabilities found." when summary is clean and vulns are empty', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 },
+        total: 0,
+      },
+      vulnerabilities: [],
+    })
+    expect(out).toContain('## Vulnerabilities')
+    expect(out).toContain('No vulnerabilities found.')
+  })
+})

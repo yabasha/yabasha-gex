@@ -128,3 +128,76 @@ export async function npmViewVersion(packageName: string): Promise<string> {
     throw formatNpmError(error, `npm view ${packageName}`)
   }
 }
+
+export type NpmAuditViaEntry =
+  | string
+  | {
+      source?: number
+      name?: string
+      dependency?: string
+      title?: string
+      url?: string
+      severity?: string
+      range?: string
+    }
+
+export type NpmAuditVulnerabilityNode = {
+  name: string
+  severity: string
+  isDirect?: boolean
+  via?: NpmAuditViaEntry[]
+  effects?: string[]
+  range?: string
+  nodes?: string[]
+  fixAvailable?: boolean | { name: string; version: string; isSemVerMajor: boolean }
+}
+
+export type NpmAuditMetadata = {
+  vulnerabilities?: Record<string, number>
+  dependencies?: {
+    prod?: number
+    dev?: number
+    optional?: number
+    peer?: number
+    peerOptional?: number
+    total?: number
+  }
+}
+
+export type NpmAuditRaw = {
+  auditReportVersion?: number
+  vulnerabilities?: Record<string, NpmAuditVulnerabilityNode>
+  metadata?: NpmAuditMetadata
+}
+
+export type NpmAuditOptions = {
+  cwd?: string
+  omitDev?: boolean
+}
+
+export async function npmAudit(options: NpmAuditOptions = {}): Promise<NpmAuditRaw> {
+  const args = ['audit', '--json']
+  if (options.omitDev) args.push('--omit=dev')
+
+  let stdout = ''
+  try {
+    const execFileAsync = await getExecFileAsync()
+    const result = await execFileAsync('npm', args, {
+      cwd: options.cwd,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    stdout = result.stdout
+  } catch (error: any) {
+    stdout = typeof error?.stdout === 'string' ? error.stdout : ''
+    if (!stdout.trim()) {
+      throw formatNpmError(error, 'npm audit')
+    }
+  }
+
+  if (!stdout.trim()) return {}
+  try {
+    return JSON.parse(stdout) as NpmAuditRaw
+  } catch (error: any) {
+    throw new Error(`npm audit returned malformed JSON: ${error?.message || error}`)
+  }
+}

@@ -16,6 +16,12 @@ function emptyCounts(): Record<Severity, number> {
   return { info: 0, low: 0, moderate: 0, high: 0, critical: 0 }
 }
 
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string' && error.length > 0) return error
+  return 'audit failed'
+}
+
 function coerceSeverity(value: unknown): Severity {
   if (typeof value === 'string') {
     const lower = value.toLowerCase()
@@ -148,6 +154,7 @@ export type AuditWorkflowOptions = {
   runAudit: () => Promise<unknown>
   normalize: AuditNormalizer
   failOn?: Severity
+  /** Caller context only — not consumed here; CLI commands pass it through alongside the workflow result. */
   outFile?: string
 }
 
@@ -166,11 +173,11 @@ export async function runAuditWorkflow(opts: AuditWorkflowOptions): Promise<Audi
     const normalized = opts.normalize(raw)
     summary = normalized.summary
     vulns = normalized.vulns
-  } catch (error: any) {
+  } catch (error: unknown) {
     summary = {
       counts: emptyCounts(),
       total: 0,
-      error: error?.message || 'audit failed',
+      error: extractErrorMessage(error),
     }
     vulns = []
   }

@@ -244,6 +244,31 @@ describe('runAuditWorkflow', () => {
     expect(result.shouldFail).toBe(false)
   })
 
+  it('soft-fails when normalize throws after successful runAudit', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => ({}),
+      normalize: () => {
+        throw new Error('bad shape')
+      },
+    })
+    expect(result.summary.error).toBe('bad shape')
+    expect(result.vulns).toEqual([])
+    expect(result.shouldFail).toBe(false)
+  })
+
+  it('soft-fails with a fallback message when a non-Error value is thrown', async () => {
+    const result = await runAuditWorkflow({
+      runAudit: async () => {
+        throw { code: 'ENOTFOUND' }
+      },
+      normalize: () => ({
+        summary: { counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 }, total: 0 },
+        vulns: [],
+      }),
+    })
+    expect(result.summary.error).toBe('audit failed')
+  })
+
   it('soft-fail with failOn set: shouldFail=true', async () => {
     const result = await runAuditWorkflow({
       runAudit: async () => {

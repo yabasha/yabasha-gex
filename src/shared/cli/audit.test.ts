@@ -299,7 +299,13 @@ describe('parseFailOn', () => {
 
   it('returns undefined for empty input', () => {
     expect(parseFailOn(undefined)).toBeUndefined()
+    expect(parseFailOn(null)).toBeUndefined()
     expect(parseFailOn('')).toBeUndefined()
+  })
+
+  it('echoes the offending value in the error', () => {
+    expect(() => parseFailOn('extreme')).toThrow(/Invalid --fail-on value: extreme/)
+    expect(() => parseFailOn(42 as unknown)).toThrow(/Invalid --fail-on value: 42/)
   })
 
   it('throws on invalid value', () => {

@@ -196,14 +196,15 @@ export async function runAuditWorkflow(opts: AuditWorkflowOptions): Promise<Audi
 
 export function parseFailOn(value: unknown): Severity | undefined {
   if (value == null || value === '') return undefined
-  if (typeof value !== 'string') {
-    throw new Error('Invalid --fail-on value (must be one of low|moderate|high|critical)')
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase()
+    if (lower === 'low' || lower === 'moderate' || lower === 'high' || lower === 'critical') {
+      return lower
+    }
   }
-  const lower = value.toLowerCase()
-  if (lower === 'low' || lower === 'moderate' || lower === 'high' || lower === 'critical') {
-    return lower
-  }
-  throw new Error(`Invalid --fail-on value: ${value} (must be one of low|moderate|high|critical)`)
+  throw new Error(
+    `Invalid --fail-on value: ${String(value)} (must be one of low|moderate|high|critical)`,
+  )
 }
 
 export function attachAuditToReport(report: Report, result: NormalizedAudit): void {

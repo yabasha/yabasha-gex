@@ -284,11 +284,59 @@ function getGlobalRootCandidates(): string[] {
   return Array.from(candidates)
 }
 
-async function getExecFileAsync(): Promise<(
-  command: string,
-  args?: readonly string[] | null,
-  options?: any,
-) => Promise<{ stdout: string; stderr: string }>> {
+async function getExecFileAsync(): Promise<
+  (
+    command: string,
+    args?: readonly string[] | null,
+    options?: any,
+  ) => Promise<{ stdout: string; stderr: string }>
+> {
   const { execFile } = await import('node:child_process')
   return promisify(execFile) as any
+}
+
+export type BunAuditAdvisory = {
+  id?: number | string
+  github_advisory_id?: string
+  cves?: string[]
+  url?: string
+  title?: string
+  severity?: string
+  vulnerable_versions?: string
+  module_name?: string
+}
+
+export type BunAuditRaw = Record<string, BunAuditAdvisory[]>
+
+export type BunAuditOptions = {
+  cwd?: string
+  omitDev?: boolean
+}
+
+export async function bunAudit(options: BunAuditOptions = {}): Promise<BunAuditRaw> {
+  const args = ['audit', '--json']
+  if (options.omitDev) args.push('--prod')
+
+  let stdout = ''
+  try {
+    const execFileAsync = await getExecFileAsync()
+    const result = await execFileAsync('bun', args, {
+      cwd: options.cwd,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    stdout = result.stdout
+  } catch (error: any) {
+    stdout = typeof error?.stdout === 'string' ? error.stdout : ''
+    if (!stdout.trim()) {
+      const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : ''
+      throw new Error(`bun audit failed: ${stderr || error?.message || 'unknown error'}`)
+    }
+  }
+
+  if (!stdout.trim()) return {}
+  try {
+    return JSON.parse(stdout) as BunAuditRaw
+  } catch (error: any) {
+    throw new Error(`bun audit returned malformed JSON: ${error?.message || error}`)
+  }
 }

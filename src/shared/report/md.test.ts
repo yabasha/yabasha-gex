@@ -198,6 +198,44 @@ describe('renderMarkdown', () => {
     }
   })
 
+  it('renders a Deprecated column when any package has a deprecated field set', () => {
+    const reportWithDeprecation: Report = {
+      report_version: '1.0',
+      timestamp: '2025-01-13T12:00:00.000Z',
+      tool_version: '0.3.2',
+      global_packages: [],
+      local_dependencies: [
+        {
+          name: 'request',
+          version: '2.88.2',
+          resolved_path: '/path/to/request',
+          deprecated: 'request has been deprecated, see https://...',
+        },
+        {
+          name: 'lodash',
+          version: '4.17.21',
+          resolved_path: '/path/to/lodash',
+          deprecated: null,
+        },
+      ],
+      local_dev_dependencies: [],
+    }
+
+    const result = renderMarkdown(reportWithDeprecation)
+
+    expect(result).toContain('Deprecated')
+    expect(result).toContain('⚠ request has been deprecated, see https://...')
+    expect(result).toContain(
+      '| request | 2.88.2 | /path/to/request | ⚠ request has been deprecated',
+    )
+    expect(result).toMatch(/\| lodash \| 4\.17\.21 \| \/path\/to\/lodash \|\s+\|/)
+  })
+
+  it('omits the Deprecated column when no package has the field set', () => {
+    const result = renderMarkdown(mockReport)
+    expect(result).not.toContain('Deprecated')
+  })
+
   it('should handle partial project metadata', () => {
     const reportWithPartialMeta = {
       ...mockReport,
@@ -212,5 +250,97 @@ describe('renderMarkdown', () => {
     expect(result).toContain('- Description: Only description provided')
     expect(result).not.toContain('- Name:')
     expect(result).not.toContain('- Version:')
+  })
+})
+
+describe('vulnerabilities section', () => {
+  const baseReport = {
+    report_version: '1.0',
+    timestamp: 't',
+    tool_version: 'v',
+    global_packages: [],
+    local_dependencies: [],
+    local_dev_dependencies: [],
+  }
+
+  it('omits the section when audit_summary is absent', () => {
+    const out = renderMarkdown(baseReport)
+    expect(out).not.toContain('## Vulnerabilities')
+  })
+
+  it('renders summary line and table when vulns are present', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 0, low: 0, moderate: 0, high: 1, critical: 1 },
+        total: 2,
+      },
+      vulnerabilities: [
+        {
+          id: 'GHSA-1',
+          package: 'lodash',
+          severity: 'critical',
+          range: '<4.17.21',
+          title: 'Prototype Pollution',
+          url: 'https://example.com',
+        },
+        {
+          id: '2',
+          package: 'axios',
+          severity: 'high',
+          range: '<1',
+          title: 'SSRF',
+          url: 'https://example.com',
+        },
+      ],
+    })
+    expect(out).toContain('## Vulnerabilities')
+    expect(out).toContain('🔴 1 critical')
+    expect(out).toContain('🟠 1 high')
+    expect(out).toContain('total 2')
+    expect(out).toContain('| Package | Severity | Range | ID | Title |')
+    expect(out).toContain('lodash')
+    expect(out).toContain('GHSA-1')
+    expect(out.indexOf('lodash')).toBeLessThan(out.indexOf('axios'))
+  })
+
+  it('renders an italicized warning when audit failed (error in summary)', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 },
+        total: 0,
+        error: 'network down',
+      },
+    })
+    expect(out).toContain('## Vulnerabilities')
+    expect(out).toContain('_Audit failed: network down_')
+    expect(out).not.toContain('| Package |')
+  })
+
+  it('renders "No vulnerabilities found." when summary is clean and vulns are empty', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 },
+        total: 0,
+      },
+      vulnerabilities: [],
+    })
+    expect(out).toContain('## Vulnerabilities')
+    expect(out).toContain('No vulnerabilities found.')
+  })
+
+  it('prepends an info segment to the summary line when info count is greater than zero', () => {
+    const out = renderMarkdown({
+      ...baseReport,
+      audit_summary: {
+        counts: { info: 3, low: 0, moderate: 0, high: 0, critical: 0 },
+        total: 3,
+      },
+      vulnerabilities: [],
+    })
+    expect(out).toContain('ℹ️ 3 info')
+    expect(out).toContain('🔴 0 critical')
   })
 })

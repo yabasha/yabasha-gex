@@ -18,7 +18,7 @@ import { run as runNodeCli } from './runtimes/node/cli.js'
 import { run as runBunCli } from './runtimes/bun/cli.js'
 
 type RuntimeKind = 'node' | 'bun'
-type RuntimeCommand = 'local' | 'global' | 'read'
+type RuntimeCommand = 'local' | 'global' | 'read' | 'audit'
 
 interface RuntimeSelectionIO {
   input?: Readable
@@ -68,6 +68,18 @@ const MENU_ITEMS: MenuItem[] = [
     runtime: 'bun',
     command: 'read',
     label: 'gex-bun read    – Bun read existing report',
+  },
+  {
+    id: '7',
+    runtime: 'node',
+    command: 'audit',
+    label: 'gex-node audit  – Node (npm) vulnerability audit report',
+  },
+  {
+    id: '8',
+    runtime: 'bun',
+    command: 'audit',
+    label: 'gex-bun audit   – Bun vulnerability audit report',
   },
 ]
 
@@ -157,7 +169,7 @@ async function promptMenuSelection(io: RuntimeSelectionIO = {}): Promise<MenuIte
 
   output.write('  q) Quit without running anything\n\n')
 
-  const answer = (await askQuestion('Enter your choice (1-6 or q): ', io)).trim().toLowerCase()
+  const answer = (await askQuestion('Enter your choice (1-8 or q): ', io)).trim().toLowerCase()
 
   if (answer === 'q' || answer === 'quit' || answer === 'exit') {
     output.write('\nExiting without running a command.\n')

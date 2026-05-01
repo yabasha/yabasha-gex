@@ -12,6 +12,54 @@ export type PackageInfo = {
   version: string
   /** Resolved file system path to the package */
   resolved_path: string
+  /** Deprecation message from the registry, or null if not deprecated. Only set when --check-deprecated is used. */
+  deprecated?: string | null
+}
+
+/**
+ * Severity levels emitted by the npm registry's bulk-advisories endpoint.
+ * Both `npm audit` and `bun audit` use this vocabulary; bun's --audit-level
+ * enum omits `info` but the bucket is preserved for npm parity.
+ */
+export type Severity = 'info' | 'low' | 'moderate' | 'high' | 'critical'
+
+/**
+ * A single vulnerability advisory, normalized across npm and bun audit shapes.
+ */
+export type Vulnerability = {
+  /** GHSA-xxxx or numeric advisory id, stringified */
+  id: string
+  /** Affected package name */
+  package: string
+  severity: Severity
+  /** Semver range or vulnerable_versions string */
+  range: string
+  /** Advisory title from the registry */
+  title: string
+  /** Canonical URL to the advisory */
+  url: string
+  cve?: string
+  ghsa?: string
+}
+
+/**
+ * Aggregate audit metadata. `dependencies` is npm-only; bun audit does not
+ * emit a metadata block, so it is undefined on the bun path. `error` is
+ * populated on soft-fail and carries the underlying audit failure message.
+ */
+export type AuditSummary = {
+  /** Severity → count map. All five keys are always present; absent severities map to 0. */
+  counts: Record<Severity, number>
+  total: number
+  dependencies?: {
+    prod: number
+    dev: number
+    optional: number
+    peer: number
+    peerOptional: number
+    total: number
+  }
+  error?: string
 }
 
 /**
@@ -36,6 +84,10 @@ export type Report = {
   local_dev_dependencies: PackageInfo[]
   /** Optional raw npm ls tree data */
   tree?: unknown
+  /** Audit summary block (populated by `gex audit`) */
+  audit_summary?: AuditSummary
+  /** Per-advisory vulnerability list (populated by `gex audit`) */
+  vulnerabilities?: Vulnerability[]
 }
 
 /**

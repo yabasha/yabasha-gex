@@ -2,7 +2,8 @@
  * @fileoverview Markdown report rendering utilities
  */
 
-import type { Report } from '../types.js'
+import { SEVERITY_RANK } from '../cli/audit.js'
+import type { AuditSummary, PackageInfo, Report, Severity, Vulnerability } from '../types.js'
 
 /**
  * Creates a markdown table from headers and row data
@@ -16,6 +17,84 @@ function table(headers: string[], rows: string[][]): string {
   const sep = `| ${headers.map(() => '---').join(' | ')} |`
   const body = rows.map((r) => `| ${r.join(' | ')} |`).join('\n')
   return [header, sep, body].filter(Boolean).join('\n')
+}
+
+function hasAnyDeprecation(packages: PackageInfo[]): boolean {
+  return packages.some((p) => typeof p.deprecated === 'string' && p.deprecated.length > 0)
+}
+
+function deprecationCell(pkg: PackageInfo): string {
+  if (typeof pkg.deprecated === 'string' && pkg.deprecated.length > 0) {
+    return `⚠ ${pkg.deprecated}`
+  }
+  return ''
+}
+
+function packageRows(
+  packages: PackageInfo[],
+  showDeprecated: boolean,
+): { headers: string[]; rows: string[][] } {
+  const headers = showDeprecated
+    ? ['Name', 'Version', 'Path', 'Deprecated']
+    : ['Name', 'Version', 'Path']
+  const rows = packages.map((p) => {
+    const base = [p.name, p.version || '', p.resolved_path || '']
+    return showDeprecated ? [...base, deprecationCell(p)] : base
+  })
+  return { headers, rows }
+}
+
+const SEVERITY_EMOJI: Record<Severity, string> = {
+  info: 'ℹ️',
+  low: '🔵',
+  moderate: '🟡',
+  high: '🟠',
+  critical: '🔴',
+}
+
+function vulnerabilitiesSection(
+  summary: AuditSummary | undefined,
+  vulns: Vulnerability[] | undefined,
+): string[] {
+  if (!summary) return []
+  const lines: string[] = ['## Vulnerabilities', '']
+
+  if (summary.error) {
+    lines.push(`_Audit failed: ${summary.error}_`)
+    lines.push('')
+    return lines
+  }
+
+  const c = summary.counts
+  const parts = [
+    `🔴 ${c.critical} critical`,
+    `🟠 ${c.high} high`,
+    `🟡 ${c.moderate} moderate`,
+    `🔵 ${c.low} low`,
+  ]
+  if (c.info > 0) parts.push(`ℹ️ ${c.info} info`)
+  lines.push(`**Summary:** ${parts.join(' · ')} · total ${summary.total}`)
+  lines.push('')
+
+  const list = vulns || []
+  if (list.length === 0) {
+    lines.push('No vulnerabilities found.')
+    lines.push('')
+    return lines
+  }
+
+  const sorted = [...list].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
+  const headers = ['Package', 'Severity', 'Range', 'ID', 'Title']
+  const rows = sorted.map((v) => [
+    v.package,
+    `${SEVERITY_EMOJI[v.severity]} ${v.severity}`,
+    v.range || '',
+    v.id,
+    v.title || '',
+  ])
+  lines.push(table(headers, rows))
+  lines.push('')
+  return lines
 }
 
 /**
@@ -76,31 +155,36 @@ export function renderMarkdown(
 
   if (report.global_packages.length > 0) {
     lines.push('## Global Packages')
-    const rows = report.global_packages.map((p) => [p.name, p.version || '', p.resolved_path || ''])
-    lines.push(table(['Name', 'Version', 'Path'], rows))
+    const { headers, rows } = packageRows(
+      report.global_packages,
+      hasAnyDeprecation(report.global_packages),
+    )
+    lines.push(table(headers, rows))
     lines.push('')
   }
 
   if (report.local_dependencies.length > 0) {
     lines.push('## Local Dependencies')
-    const rows = report.local_dependencies.map((p) => [
-      p.name,
-      p.version || '',
-      p.resolved_path || '',
-    ])
-    lines.push(table(['Name', 'Version', 'Path'], rows))
+    const { headers, rows } = packageRows(
+      report.local_dependencies,
+      hasAnyDeprecation(report.local_dependencies),
+    )
+    lines.push(table(headers, rows))
     lines.push('')
   }
 
   if (report.local_dev_dependencies.length > 0) {
     lines.push('## Local Dev Dependencies')
-    const rows = report.local_dev_dependencies.map((p) => [
-      p.name,
-      p.version || '',
-      p.resolved_path || '',
-    ])
-    lines.push(table(['Name', 'Version', 'Path'], rows))
+    const { headers, rows } = packageRows(
+      report.local_dev_dependencies,
+      hasAnyDeprecation(report.local_dev_dependencies),
+    )
+    lines.push(table(headers, rows))
     lines.push('')
+  }
+
+  for (const line of vulnerabilitiesSection(report.audit_summary, report.vulnerabilities)) {
+    lines.push(line)
   }
 
   lines.push('---')

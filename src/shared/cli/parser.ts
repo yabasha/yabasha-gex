@@ -15,26 +15,55 @@ export function isMarkdownReportFile(filePath: string): boolean {
   return ext === '.md' || ext === '.markdown'
 }
 
+function splitMarkdownRow(line: string): string[] {
+  return line
+    .split('|')
+    .map((c) => c.trim())
+    .filter((_, idx, arr) => !(idx === 0 || idx === arr.length - 1))
+}
+
 /**
- * Parses a markdown table and extracts package information
+ * Parses a markdown table and extracts package information.
+ *
+ * Reads the header row at `startIndex` to detect column positions, so this
+ * works whether the table has the base 3 columns (Name, Version, Path) or
+ * the 4-column variant emitted when any package has a `deprecated` field
+ * set (Name, Version, Path, Deprecated). Without this header detection the
+ * `Deprecated` column would be silently dropped on markdown round-trips.
  *
  * @param lines - Array of file lines
- * @param startIndex - Index where table starts
+ * @param startIndex - Index of the header row
  * @returns Array of package information
  */
 function parseMarkdownPackagesTable(lines: string[], startIndex: number): PackageInfo[] {
   const rows: PackageInfo[] = []
   if (!lines[startIndex] || !lines[startIndex].trim().startsWith('|')) return rows
 
+  const header = splitMarkdownRow(lines[startIndex]).map((c) => c.toLowerCase())
+  const nameIdx = header.indexOf('name')
+  const versionIdx = header.indexOf('version')
+  const pathIdx = header.indexOf('path')
+  const deprecatedIdx = header.indexOf('deprecated')
+
   let i = startIndex + 2
   while (i < lines.length && lines[i].trim().startsWith('|')) {
-    const cols = lines[i]
-      .split('|')
-      .map((c) => c.trim())
-      .filter((_, idx, arr) => !(idx === 0 || idx === arr.length - 1))
+    const cols = splitMarkdownRow(lines[i])
+    const name = nameIdx >= 0 ? cols[nameIdx] || '' : cols[0] || ''
+    const version = versionIdx >= 0 ? cols[versionIdx] || '' : cols[1] || ''
+    const resolved_path = pathIdx >= 0 ? cols[pathIdx] || '' : cols[2] || ''
 
-    const [name = '', version = '', resolved_path = ''] = cols
-    if (name) rows.push({ name, version, resolved_path })
+    if (name) {
+      const pkg: PackageInfo = { name, version, resolved_path }
+      if (deprecatedIdx >= 0) {
+        const cell = cols[deprecatedIdx] || ''
+        // Renderer emits "⚠ <message>" for deprecated entries and "" for non-deprecated.
+        // Round-trip preserves the message when present; absent cells map to null
+        // so consumers can distinguish "checked, not deprecated" from "not checked".
+        const stripped = cell.replace(/^⚠\s+/, '')
+        pkg.deprecated = stripped.length > 0 ? stripped : null
+      }
+      rows.push(pkg)
+    }
     i++
   }
   return rows

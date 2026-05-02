@@ -1,5 +1,19 @@
 # @yabasha/gex
 
+## 1.5.0
+
+### Minor Changes
+
+- Add Yarn and pnpm runtimes with dedicated `gex-yarn` and `gex-pnpm` CLIs (#25).
+
+  Add license inventory and allowlist enforcement via `--with-license` and `--license-allowlist` (#23).
+
+  Add `--from-lockfile` mode to build reports from `package-lock.json` without invoking `npm ls` (#24).
+
+  Add `diff` command to compare two reports and surface added, removed, and changed packages (#22).
+
+  Add `--check-deprecated` flag and `gex audit` subcommand for deprecation and advisory checks (#26).
+
 ## 1.4.4
 
 ### Patch Changes

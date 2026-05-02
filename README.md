@@ -13,12 +13,17 @@
 
 ![npm version](https://img.shields.io/npm/v/@yabasha/gex.svg?style=for-the-badge) ![license](https://img.shields.io/github/license/yabasha/yabasha-gex?style=for-the-badge) ![Node.js >= 20](https://img.shields.io/badge/Node-%3E%3D20-brightgreen.svg?style=for-the-badge) ![Bun support](https://img.shields.io/badge/Bun-Supported-blue.svg?style=for-the-badge)
 
-GEX is a focused CLI that generates structured, reproducible reports of your Node.js / bun package environments:
+GEX is a focused CLI that generates structured, reproducible reports of your JavaScript package environments across **four runtimes** — Node.js (npm), Bun, Yarn, and pnpm:
 
 - Local project dependencies (default)
 - Globally installed packages
+- Vulnerability audits (`gex audit`)
+- Diffs between two reports (`gex diff`)
+- License inventories with optional SPDX allowlist enforcement
+- Lockfile-only mode that skips `npm ls` for fast, isolated reports
+- Deprecation flagging against the npm registry
 
-Reports can be emitted as machine-readable JSON (default) or human-friendly Markdown. Use GEX to inventory environments, document state for handovers/audits, and keep a versionable dependency log.
+Reports can be emitted as machine-readable JSON (default) or human-friendly Markdown. Use GEX to inventory environments, document state for handovers/audits, gate licenses in CI, and keep a versionable dependency log.
 
 ## Install
 
@@ -62,7 +67,7 @@ Reports can be emitted as machine-readable JSON (default) or human-friendly Mark
 Starting with v1.3.6, the primary `gex` binary is an interactive launcher that lets you choose both:
 
 - Which runtime to use: Node/npm (`gex-node`) or Bun (`gex-bun`)
-- Which command to run: `local`, `global`, or `read`
+- Which command to run: `local`, `global`, `audit`, or `read`
 
 Run:
 
@@ -82,6 +87,8 @@ Choose a runtime and command to run:
   4) gex-bun local   – Bun local project report
   5) gex-bun global  – Bun global packages report
   6) gex-bun read    – Bun read existing report
+  7) gex-node audit  – Node (npm) vulnerability audit report
+  8) gex-bun audit   – Bun vulnerability audit report
   q) Quit without running anything
 ```
 
@@ -99,7 +106,9 @@ Anything you type here is used to build and execute the final command. For examp
 
 If you run `gex` **with arguments** (for example `gex local --check-outdated`), it behaves like `gex-node` for backward compatibility and forwards those arguments to the Node runtime.
 
-### Direct runtimes: `gex-node` (Node) and `gex-bun` (Bun)
+> **Tip:** the Yarn and pnpm runtimes (`gex-yarn`, `gex-pnpm`) are not yet in the launcher menu — invoke them directly as shown below.
+
+### Direct runtimes: `gex-node`, `gex-bun`, `gex-yarn`, `gex-pnpm`
 
 You can also call each runtime directly without the interactive launcher:
 
@@ -109,16 +118,37 @@ gex-node [command] [options]   # Node.js / npm runtime (formerly `gex`)
 
 gex-bun [command] [options]    # Bun runtime
 # Alias: gb
+
+gex-yarn [command] [options]   # Yarn runtime
+gex-pnpm [command] [options]   # pnpm runtime
 ```
 
-Common command options:
+Each runtime exposes the same command surface (`local`, `global`, `read`). The Node and Bun runtimes additionally support `audit` and the full set of analysis flags (`--check-outdated`, `--update-outdated`, `--check-deprecated`, `--with-license`, `--license-allowlist`, `--from-lockfile`). The Yarn and pnpm runtimes currently support the core `local`/`global`/`read` commands with `--full-tree` and `--omit-dev`.
 
-- -f, --output-format <md|json> (default: json)
-- -o, --out-file <path>
-- --full-tree Include the full npm ls JSON under `tree` (default uses depth=0)
-- --omit-dev Local only; exclude devDependencies
-- -c, --check-outdated Print a table of outdated packages (shows a lightweight spinner while checking; skips console report output unless `-o` is set so you can write the report to file instead)
-- -u, --update-outdated [pkg1 pkg2 ...] Update outdated packages (omit names to update everything). Node CLI shells out to `npm update`; Bun CLI mirrors `bun update` for locals and reinstalls globals via `bun add -g pkg@latest`.
+### Commands
+
+- `local` _(default)_ — report on the current project's dependencies
+- `global` — report on globally installed packages
+- `audit` — run a vulnerability audit and embed it in the report (Node/Bun)
+- `diff <old> <new>` — compare two reports and show added / removed / upgraded / downgraded packages
+- `read [report]` — parse a previously generated JSON or Markdown report and either print or install the listed packages
+
+### Common options (Node / Bun runtimes)
+
+| Flag                              | Applies to           | Description                                                                                                                                                           |
+| --------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-f, --output-format <md\|json>`  | all                  | Output format (default `json`; `diff` defaults to `md`)                                                                                                               |
+| `-o, --out-file <path>`           | all                  | Write output to a file                                                                                                                                                |
+| `--full-tree`                     | local, global, audit | Include the full `npm ls` JSON under `tree` (default uses depth=0)                                                                                                    |
+| `--omit-dev`                      | local, audit         | Exclude `devDependencies`                                                                                                                                             |
+| `-c, --check-outdated`            | local, global, audit | Print a table of outdated packages (spinner while checking; skips the report on stdout unless `-o` is set)                                                            |
+| `-u, --update-outdated [pkgs...]` | local, global, audit | Update outdated packages (omit names to update everything). Node shells out to `npm update`; Bun runs `bun update` for locals and `bun add -g pkg@latest` for globals |
+| `--check-deprecated`              | local, global, audit | Flag packages marked deprecated in the npm registry                                                                                                                   |
+| `--with-license`                  | local, global, audit | Include each package's SPDX license in the report                                                                                                                     |
+| `--license-allowlist <list>`      | local, global, audit | Comma-separated SPDX licenses to allow; non-empty list implies `--with-license` and exits non-zero on any violation                                                   |
+| `--from-lockfile`                 | local, audit         | Build the report from `package-lock.json` instead of running `npm ls`                                                                                                 |
+| `--fail-on <severity>`            | audit only           | Exit 1 when severity at or above threshold is present (`low\|moderate\|high\|critical`); exit 2 if the threshold itself is invalid                                    |
+| `--fail-on-changes`               | diff only            | Exit non-zero if any changes are detected                                                                                                                             |
 
 Examples (Node/npm runtime via `gex-node`):
 
@@ -161,6 +191,36 @@ gex-node local -u axios react                      # update specific packages
 # Bun runtime uses the same flags with Bun semantics
 gex-bun local --check-outdated
 gex-bun global --update-outdated              # updates global Bun installs via `bun update`/`bun add -g`
+
+# Vulnerability audit (Node / Bun)
+gex-node audit                                     # JSON audit report on stdout
+gex-node audit -f md -o audit.md                   # Markdown audit report to file
+gex-node audit --fail-on high                      # exit 1 if any high or critical advisories are found
+gex-node audit --omit-dev --fail-on critical       # production-only audit, fail only on critical
+
+# Deprecation flagging
+gex-node local --check-deprecated                  # mark deprecated packages in the report
+gex-node global --check-deprecated -f md           # works for global packages too
+
+# License inventory and allowlist enforcement
+gex-node local --with-license                      # include SPDX license per package
+gex-node local --license-allowlist "MIT,Apache-2.0,BSD-3-Clause"
+                                                   # exits non-zero on any package outside the allowlist
+
+# Lockfile-only mode (skips `npm ls`, reads package-lock.json directly)
+gex-node local --from-lockfile                     # fast, deterministic; ideal for CI
+gex-node audit --from-lockfile --fail-on high      # audit straight from the lockfile
+
+# Diff two reports
+gex diff old.json new.json                         # Markdown diff on stdout (default for diff)
+gex diff old.json new.json -f json -o changes.json # JSON diff to file
+gex diff old.json new.json --fail-on-changes       # CI gate: non-zero exit if anything changed
+
+# Yarn / pnpm runtimes (core local/global/read commands)
+gex-yarn local -f md -o yarn-report.md
+gex-yarn global -o yarn-global.json
+gex-pnpm local --omit-dev -f md
+gex-pnpm global --full-tree -o pnpm-global.json
 ```
 
 > **Note**: Starting from v0.4.0, GEX outputs to console by default instead of creating files automatically. Use the `-o/--out-file` flag to write to a file.

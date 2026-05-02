@@ -1,5 +1,11 @@
 # @yabasha/gex
 
+## 1.5.1
+
+### Patch Changes
+
+- Update README to document the latest CLI surface: Yarn and pnpm runtimes, `audit` and `diff` commands, and the `--check-deprecated`, `--with-license`, `--license-allowlist`, `--from-lockfile`, `--fail-on`, and `--fail-on-changes` flags.
+
 ## 1.5.0
 
 ### Minor Changes

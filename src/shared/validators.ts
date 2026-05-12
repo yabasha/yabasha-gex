@@ -85,6 +85,28 @@ export function validatePackageName(name: string): string {
 }
 
 /**
+ * Validate a package entry and render it as an argv-safe `name@version` spec.
+ *
+ * Reports are an untrusted input: a `read --install` flow takes arbitrary JSON/MD
+ * and feeds the resulting names/versions into `execFile(<pm>, ['add', spec])`.
+ * Even though `execFile` blocks shell-metachar injection, each spec is still a
+ * standalone argv token — so an unvalidated `--registry=http://evil/` or `-g`
+ * would land as a flag to the package manager (registry hijack, scope change,
+ * arbitrary install). This validator rejects flag-shaped names and bad chars.
+ *
+ * Centralized here so every install entry point shares one source of truth for
+ * the security policy.
+ */
+export function validateAndFormatPackageSpec(pkg: { name: string; version: string }): string {
+  const name = validatePackageName(pkg.name)
+  if (name.startsWith('-')) {
+    throw new ValidationError(`Package name cannot start with '-': ${name}`)
+  }
+  const version = validateVersion(pkg.version ?? '')
+  return version ? `${name}@${version}` : name
+}
+
+/**
  * Validates semantic version strings
  */
 export function validateVersion(version: string): string {

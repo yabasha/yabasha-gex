@@ -12,7 +12,12 @@ import { npmLs, npmRootGlobal } from './runtimes/node/package-manager.js'
 import { buildReportFromNpmTree } from './shared/transform.js'
 import { renderJson } from './shared/report/json.js'
 import { renderMarkdown } from './shared/report/md.js'
-import { npmRateLimiter, validateFilePath, validateOutputFormat } from './shared/validators.js'
+import {
+  npmRateLimiter,
+  validateAndFormatPackageSpec,
+  validateFilePath,
+  validateOutputFormat,
+} from './shared/validators.js'
 import type { OutputFormat, PackageInfo, Report } from './shared/types.js'
 
 const execFileAsync = promisify(execFile)
@@ -56,6 +61,11 @@ export interface InstallOptions {
   cwd?: string
   /** Whether to perform a dry run (log commands without executing) */
   dryRun?: boolean
+  /**
+   * Opt in to running lifecycle scripts (pre/post install) of installed packages.
+   * Off by default — reports may originate from untrusted sources.
+   */
+  allowScripts?: boolean
 }
 
 /**
@@ -196,9 +206,9 @@ export async function installPackagesFromReport(
 ): Promise<void> {
   const cwd = options.cwd ? validateFilePath(options.cwd) : process.cwd()
 
-  const globalPkgs = report.global_packages.map((p) => `${p.name}@${p.version}`).filter(Boolean)
-  const localPkgs = report.local_dependencies.map((p) => `${p.name}@${p.version}`).filter(Boolean)
-  const devPkgs = report.local_dev_dependencies.map((p) => `${p.name}@${p.version}`).filter(Boolean)
+  const globalPkgs = report.global_packages.map(validateAndFormatPackageSpec).filter(Boolean)
+  const localPkgs = report.local_dependencies.map(validateAndFormatPackageSpec).filter(Boolean)
+  const devPkgs = report.local_dev_dependencies.map(validateAndFormatPackageSpec).filter(Boolean)
 
   if (globalPkgs.length === 0 && localPkgs.length === 0 && devPkgs.length === 0) {
     return
@@ -217,19 +227,32 @@ export async function installPackagesFromReport(
     return
   }
 
+  const safetyFlags = options.allowScripts ? [] : ['--ignore-scripts']
+  // Env-var defense-in-depth: covers Yarn Berry (which silently drops the CLI
+  // flag) and npm/pnpm subcommands whose flag handling is fuzzy.
+  const execOptions = {
+    cwd,
+    maxBuffer: 10 * 1024 * 1024,
+    ...(options.allowScripts
+      ? {}
+      : {
+          env: { ...process.env, npm_config_ignore_scripts: 'true', YARN_ENABLE_SCRIPTS: 'false' },
+        }),
+  }
+
   if (globalPkgs.length > 0) {
     await npmRateLimiter.throttle()
-    await execFileAsync('npm', ['i', '-g', ...globalPkgs], { cwd, maxBuffer: 10 * 1024 * 1024 })
+    await execFileAsync('npm', ['i', '-g', ...safetyFlags, ...globalPkgs], execOptions)
   }
 
   if (localPkgs.length > 0) {
     await npmRateLimiter.throttle()
-    await execFileAsync('npm', ['i', ...localPkgs], { cwd, maxBuffer: 10 * 1024 * 1024 })
+    await execFileAsync('npm', ['i', ...safetyFlags, ...localPkgs], execOptions)
   }
 
   if (devPkgs.length > 0) {
     await npmRateLimiter.throttle()
-    await execFileAsync('npm', ['i', '-D', ...devPkgs], { cwd, maxBuffer: 10 * 1024 * 1024 })
+    await execFileAsync('npm', ['i', '-D', ...safetyFlags, ...devPkgs], execOptions)
   }
 }
 

@@ -3,12 +3,19 @@
  */
 
 import type { Report } from '../types.js'
+import { validateAndFormatPackageSpec } from '../validators.js'
 
 type PackageManager = 'npm' | 'bun' | 'yarn' | 'pnpm'
 
 export type InstallOptions = {
   cwd: string
   packageManager?: PackageManager
+  /**
+   * Opt in to running lifecycle scripts (preinstall/postinstall) of installed packages.
+   * Off by default — reports may originate from untrusted sources, and a malicious
+   * package name + install scripts is a one-shot RCE on the developer machine.
+   */
+  allowScripts?: boolean
 }
 
 const INSTALL_COMMANDS: Record<
@@ -39,8 +46,27 @@ const INSTALL_COMMANDS: Record<
 
 const MAX_BUFFER = 10 * 1024 * 1024
 
-function formatSpec(pkg: { name: string; version: string }): string {
-  return pkg.version ? `${pkg.name}@${pkg.version}` : pkg.name
+/**
+ * Build environment variables that suppress lifecycle scripts even on package
+ * managers that silently ignore the `--ignore-scripts` CLI flag.
+ *
+ * - Yarn Berry (v2+) does not accept `--ignore-scripts` at all; it gates scripts
+ *   via `enableScripts` in .yarnrc.yml or the YARN_ENABLE_SCRIPTS env var.
+ * - npm / pnpm respect both the CLI flag and `npm_config_ignore_scripts`; we set
+ *   the env var as defense-in-depth in case the flag is dropped or unrecognized
+ *   on a future subcommand (e.g. pnpm global modes whose flag support is fuzzy).
+ * - bun honors the CLI flag.
+ *
+ * Returns undefined when the caller has opted into running scripts, so
+ * `process.env` is left intact.
+ */
+function buildSafetyEnv(allowScripts: boolean): Record<string, string | undefined> | undefined {
+  if (allowScripts) return undefined
+  return {
+    ...process.env,
+    npm_config_ignore_scripts: 'true',
+    YARN_ENABLE_SCRIPTS: 'false',
+  }
 }
 
 /**
@@ -70,11 +96,11 @@ export async function installFromReport(
   options: InstallOptions | string,
 ): Promise<void> {
   const opts = typeof options === 'string' ? { cwd: options } : options
-  const { cwd, packageManager = 'npm' } = opts
+  const { cwd, packageManager = 'npm', allowScripts = false } = opts
 
-  const globalPkgs = report.global_packages.map(formatSpec).filter(Boolean)
-  const localPkgs = report.local_dependencies.map(formatSpec).filter(Boolean)
-  const devPkgs = report.local_dev_dependencies.map(formatSpec).filter(Boolean)
+  const globalPkgs = report.global_packages.map(validateAndFormatPackageSpec).filter(Boolean)
+  const localPkgs = report.local_dependencies.map(validateAndFormatPackageSpec).filter(Boolean)
+  const devPkgs = report.local_dev_dependencies.map(validateAndFormatPackageSpec).filter(Boolean)
 
   if (globalPkgs.length === 0 && localPkgs.length === 0 && devPkgs.length === 0) {
     console.log('No packages to install from report.')
@@ -85,20 +111,26 @@ export async function installFromReport(
   const execFileAsync = await getExecFileAsync()
   const cmd = INSTALL_COMMANDS[packageManager]
   const binary = packageManager === 'npm' ? 'npm' : packageManager
+  // CLI flag covers npm / bun / pnpm / Yarn Classic. Env-var fallback covers
+  // Yarn Berry (which silently ignores the flag) and acts as defense-in-depth
+  // for npm/pnpm subcommands that may not honor the flag.
+  const safetyFlags = allowScripts ? [] : ['--ignore-scripts']
+  const safetyEnv = buildSafetyEnv(allowScripts)
+  const execOptions = { cwd, maxBuffer: MAX_BUFFER, ...(safetyEnv ? { env: safetyEnv } : {}) }
 
   if (globalPkgs.length > 0) {
     console.log(`Installing global: ${globalPkgs.join(' ')}`)
-    await execFileAsync(binary, [...cmd.global, ...globalPkgs], { cwd, maxBuffer: MAX_BUFFER })
+    await execFileAsync(binary, [...cmd.global, ...safetyFlags, ...globalPkgs], execOptions)
   }
 
   if (localPkgs.length > 0) {
     console.log(`Installing local deps: ${localPkgs.join(' ')}`)
-    await execFileAsync(binary, [...cmd.local, ...localPkgs], { cwd, maxBuffer: MAX_BUFFER })
+    await execFileAsync(binary, [...cmd.local, ...safetyFlags, ...localPkgs], execOptions)
   }
 
   if (devPkgs.length > 0) {
     console.log(`Installing local devDeps: ${devPkgs.join(' ')}`)
-    await execFileAsync(binary, [...cmd.dev, ...devPkgs], { cwd, maxBuffer: MAX_BUFFER })
+    await execFileAsync(binary, [...cmd.dev, ...safetyFlags, ...devPkgs], execOptions)
   }
 }
 

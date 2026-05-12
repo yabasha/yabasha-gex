@@ -129,6 +129,24 @@ describe('installFromReport', () => {
     )
   })
 
+  it('sets env-var safety (YARN_ENABLE_SCRIPTS + npm_config_ignore_scripts) by default', async () => {
+    await installFromReport(baseReport, { cwd: '/tmp/project', packageManager: 'yarn' })
+
+    expect(execFileAsync).toHaveBeenCalled()
+    const callArgs = execFileAsync.mock.calls[0][2] as { env?: Record<string, string | undefined> }
+    expect(callArgs.env).toBeDefined()
+    expect(callArgs.env!.YARN_ENABLE_SCRIPTS).toBe('false')
+    expect(callArgs.env!.npm_config_ignore_scripts).toBe('true')
+  })
+
+  it('does not override env when allowScripts is true', async () => {
+    await installFromReport(baseReport, { cwd: '/tmp/project', allowScripts: true })
+
+    expect(execFileAsync).toHaveBeenCalled()
+    const callArgs = execFileAsync.mock.calls[0][2] as { env?: Record<string, string | undefined> }
+    expect(callArgs.env).toBeUndefined()
+  })
+
   it('omits --ignore-scripts when allowScripts is true', async () => {
     await installFromReport(baseReport, { cwd: '/tmp/project', allowScripts: true })
 

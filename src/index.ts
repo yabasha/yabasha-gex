@@ -14,11 +14,9 @@ import { renderJson } from './shared/report/json.js'
 import { renderMarkdown } from './shared/report/md.js'
 import {
   npmRateLimiter,
+  validateAndFormatPackageSpec,
   validateFilePath,
   validateOutputFormat,
-  validatePackageName,
-  validateVersion,
-  ValidationError,
 } from './shared/validators.js'
 import type { OutputFormat, PackageInfo, Report } from './shared/types.js'
 
@@ -208,18 +206,9 @@ export async function installPackagesFromReport(
 ): Promise<void> {
   const cwd = options.cwd ? validateFilePath(options.cwd) : process.cwd()
 
-  const toSpec = (p: PackageInfo): string => {
-    const name = validatePackageName(p.name)
-    if (name.startsWith('-')) {
-      throw new ValidationError(`Package name cannot start with '-': ${name}`)
-    }
-    const version = validateVersion(p.version ?? '')
-    return version ? `${name}@${version}` : name
-  }
-
-  const globalPkgs = report.global_packages.map(toSpec).filter(Boolean)
-  const localPkgs = report.local_dependencies.map(toSpec).filter(Boolean)
-  const devPkgs = report.local_dev_dependencies.map(toSpec).filter(Boolean)
+  const globalPkgs = report.global_packages.map(validateAndFormatPackageSpec).filter(Boolean)
+  const localPkgs = report.local_dependencies.map(validateAndFormatPackageSpec).filter(Boolean)
+  const devPkgs = report.local_dev_dependencies.map(validateAndFormatPackageSpec).filter(Boolean)
 
   if (globalPkgs.length === 0 && localPkgs.length === 0 && devPkgs.length === 0) {
     return
@@ -239,29 +228,31 @@ export async function installPackagesFromReport(
   }
 
   const safetyFlags = options.allowScripts ? [] : ['--ignore-scripts']
+  // Env-var defense-in-depth: covers Yarn Berry (which silently drops the CLI
+  // flag) and npm/pnpm subcommands whose flag handling is fuzzy.
+  const execOptions = {
+    cwd,
+    maxBuffer: 10 * 1024 * 1024,
+    ...(options.allowScripts
+      ? {}
+      : {
+          env: { ...process.env, npm_config_ignore_scripts: 'true', YARN_ENABLE_SCRIPTS: 'false' },
+        }),
+  }
 
   if (globalPkgs.length > 0) {
     await npmRateLimiter.throttle()
-    await execFileAsync('npm', ['i', '-g', ...safetyFlags, ...globalPkgs], {
-      cwd,
-      maxBuffer: 10 * 1024 * 1024,
-    })
+    await execFileAsync('npm', ['i', '-g', ...safetyFlags, ...globalPkgs], execOptions)
   }
 
   if (localPkgs.length > 0) {
     await npmRateLimiter.throttle()
-    await execFileAsync('npm', ['i', ...safetyFlags, ...localPkgs], {
-      cwd,
-      maxBuffer: 10 * 1024 * 1024,
-    })
+    await execFileAsync('npm', ['i', ...safetyFlags, ...localPkgs], execOptions)
   }
 
   if (devPkgs.length > 0) {
     await npmRateLimiter.throttle()
-    await execFileAsync('npm', ['i', '-D', ...safetyFlags, ...devPkgs], {
-      cwd,
-      maxBuffer: 10 * 1024 * 1024,
-    })
+    await execFileAsync('npm', ['i', '-D', ...safetyFlags, ...devPkgs], execOptions)
   }
 }
 

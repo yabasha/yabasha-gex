@@ -1,5 +1,14 @@
 # @yabasha/gex
 
+## 1.5.2
+
+### Patch Changes
+
+- Security: harden `gex read --install` against malicious reports.
+  - Validate every package spec via `validateAndFormatPackageSpec` (a new shared helper in `src/shared/validators.ts`) before passing it to `npm`/`bun`/`yarn`/`pnpm`. Flag-shaped names like `--registry=...` or `-g` are now rejected — previously they would have been parsed as CLI flags by the package manager, enabling registry hijack, scope changes, or arbitrary installs.
+  - Default to `--ignore-scripts` on every install invocation across all four package managers, with a new `allowScripts` opt-in (on `InstallOptions` for both `installFromReport` and `installPackagesFromReport`) for callers who trust the report source.
+  - Defense-in-depth: also set `YARN_ENABLE_SCRIPTS=false` and `npm_config_ignore_scripts=true` via the spawned process env, so Yarn Berry (which silently drops `--ignore-scripts`) and fuzzy pnpm subcommands still suppress lifecycle scripts.
+
 ## 1.5.1
 
 ### Patch Changes
